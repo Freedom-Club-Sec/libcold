@@ -75,12 +75,12 @@ impl Clone for Contact {
             contact_signing_pub_key: self.contact_signing_pub_key.clone(),
 
             our_ml_kem_pub_key: self.our_ml_kem_pub_key.clone(),
-            our_ml_kem_secret_key: self.our_ml_kem_pub_key.clone(),
-            contact_ml_kem_pub_key: self.our_ml_kem_pub_key.clone(),
+            our_ml_kem_secret_key: self.our_ml_kem_secret_key.clone(),
+            contact_ml_kem_pub_key: self.contact_ml_kem_pub_key.clone(),
 
-            our_mceliece_pub_key: self.our_ml_kem_pub_key.clone(),
-            our_mceliece_secret_key: self.our_ml_kem_pub_key.clone(),
-            contact_mceliece_pub_key: self.our_ml_kem_pub_key.clone(),
+            our_mceliece_pub_key: self.our_mceliece_pub_key.clone(),
+            our_mceliece_secret_key: self.our_mceliece_pub_key.clone(),
+            contact_mceliece_pub_key: self.contact_mceliece_pub_key.clone(),
 
 
 
@@ -577,8 +577,10 @@ impl Contact {
         payload.extend_from_slice(&pks_hash_chain);
 
 
-        self.our_hash_chain = Some(our_next_hash_chain);
         let final_payload = self.prepare_payload(&payload)?;
+
+        self.our_hash_chain = Some(our_next_hash_chain);
+
 
         Ok(final_payload)
     
