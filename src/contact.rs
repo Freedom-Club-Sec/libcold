@@ -506,8 +506,7 @@ impl Contact {
             return Err(Error::SMPInvalidContactProof);
         }
 
-
-        Ok(ContactOutput::None)
+        self.do_new_ephemeral_keys()
     }
 
 
@@ -527,15 +526,89 @@ impl Contact {
 
  
         let mut out = Zeroizing::new(Vec::with_capacity(1 + 32 + consts::STRAND_NONCE_SIZE + 7));
-        out.push(consts::SMP_TYPE_INIT_SMP);
         out.extend_from_slice(&our_next_strand_key);
         out.extend_from_slice(&our_next_strand_nonce);
+        out.push(consts::SMP_TYPE_INIT_SMP);
         out.extend_from_slice(b"failure");
 
 
         Ok(ContactOutput::Wire(WireMessage(out)))
 
     }
+
+  
+    fn do_pfs_new_and_acks(&mut self, data: &[u8]) ->  Result<(ContactOutput, bool), Error> {
+        let pfs_plaintext = self.decrypt_incoming_data(data)?;
+
+        let type_byte = pfs_plaintext.get(0)
+            .ok_or(Error::InvalidPfsPlaintextLength)?;
+
+        if type_byte != &consts::PFS_TYPE_PFS_NEW {
+            return Err(Error::InvalidPfsType);
+        }
+
+        let pfs_plaintext = pfs_plaintext.get(1..)
+            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+
+
+        if pfs_plaintext.len() != 64 + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_SIZE {
+            return Err(Error::InvalidPfsPlaintextLength);
+        }
+
+
+        let contact_signing_pk = self.contact_signing_pub_key
+            .as_ref().unwrap();
+
+        let contact_hash_chain = self.contact_hash_chain
+            .as_ref();
+
+
+        let signature = pfs_plaintext.get(.. consts::ML_DSA_87_SIGN_SIZE)
+            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+
+        let signature_data = pfs_plaintext.get(consts::ML_DSA_87_SIGN_SIZE + 64 ..)
+            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+
+        // Verify the signature of the public-keys and the hash-chain.
+        crypto::verify_signature(oqs::sig::Algorithm::MlDsa87, contact_signing_pk, signature_data, signature)?;
+
+        let contact_next_hash_chain = pfs_plaintext.get(consts::ML_DSA_87_SIGN_SIZE .. consts::ML_DSA_87_SIGN_SIZE + 64)
+            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+
+
+        let contact_ml_kem_pk = pfs_plaintext.get(64 + consts::ML_DSA_87_SIGN_SIZE .. 64 + consts::ML_DSA_87_SIGN_SIZE + consts::ML_KEM_1024_PK_SIZE)
+            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+
+        let contact_mceliece_pk = pfs_plaintext.get(64 + consts::ML_DSA_87_SIGN_SIZE + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_SIZE ..)
+            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+
+
+        if contact_hash_chain.is_some() {
+            let computed_hash_chain = crypto::hash_sha3_512(&contact_hash_chain.unwrap());
+            if computed_hash_chain.as_slice() != contact_next_hash_chain {
+                return Err(Error::InvalidHashChain);
+            }
+
+        } else {
+            // If we do not have a hashchain for the contact, we don't need to compute the chain, just save.
+            self.contact_hash_chain = Some(Zeroizing::new(contact_next_hash_chain.to_vec()));
+        }
+
+        self.contact_ml_kem_pub_key = Some(Zeroizing::new(contact_ml_kem_pk.to_vec()));
+        self.contact_mceliece_pub_key = Some(Zeroizing::new(contact_mceliece_pk.to_vec()));
+
+        let mut payload = Zeroizing::new(Vec::with_capacity(1));
+        payload.push(consts::PFS_TYPE_PFS_ACK);
+
+        let final_payload = self.prepare_payload(&payload)?;
+
+        if !self.our_ml_kem_pub_key.is_some() || !self.our_mceliece_pub_key.is_some() {
+
+        }
+        Ok((final_payload, false))
+    }
+
+
 
     fn do_new_ephemeral_keys(&mut self) ->  Result<ContactOutput, Error> {
         let ml_dsa_sk = self.our_signing_secret_key
@@ -556,22 +629,22 @@ impl Contact {
 
         let our_next_hash_chain = crypto::hash_sha3_512(&our_hash_chain);
 
-        let mut pks_hash_chain = Zeroizing::new(Vec::with_capacity(64 + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_LEN ));
+        let mut pks_hash_chain = Zeroizing::new(Vec::with_capacity(64 + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_SIZE ));
         pks_hash_chain.extend_from_slice(our_next_hash_chain.as_slice());
         pks_hash_chain.extend_from_slice(ml_kem_pk.as_slice());
         pks_hash_chain.extend_from_slice(mceliece_pk.as_slice());
 
-        let signed_pks_hash_chain = crypto::generate_signature(oqs::sig::Algorithm::MlDsa87, ml_dsa_sk, &pks_hash_chain)?;
+        let signature_pks_hash_chain = crypto::generate_signature(oqs::sig::Algorithm::MlDsa87, ml_dsa_sk, &pks_hash_chain)?;
 
         let mut payload = Zeroizing::new(Vec::with_capacity(
                 1 + 
-                signed_pks_hash_chain.len() +
+                signature_pks_hash_chain.len() +
                 pks_hash_chain.len()
 
             ));
 
         payload.push(consts::PFS_TYPE_PFS_NEW);
-        payload.extend_from_slice(&signed_pks_hash_chain);
+        payload.extend_from_slice(&signature_pks_hash_chain);
         payload.extend_from_slice(&pks_hash_chain);
 
 
@@ -584,7 +657,6 @@ impl Contact {
 
         self.our_mceliece_pub_key = Some(mceliece_pk);
         self.our_mceliece_secret_key = Some(mceliece_sk);
-
 
         Ok(final_payload)
     
@@ -757,8 +829,8 @@ mod tests {
         assert!(result.is_ok());
 
         let result = match result.unwrap() {
-            ContactOutput::None => {},
-            _ => panic!("Expected None output"),
+            ContactOutput::Wire(w) => w,
+            _ => panic!("Expected Wire output"),
         };
 
 

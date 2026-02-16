@@ -18,6 +18,7 @@ pub enum Error {
     InvalidKemPublicKeyLength,
     InvalidKemSecretKey,
     InvalidKemCiphertextLength,
+    InvalidSigPublicKey,
     InvalidSigSecretKey,
     InvalidChaCha20PaddingLength,
     InvalidChaCha20KeyLength,
@@ -29,6 +30,8 @@ pub enum Error {
     
     InvalidSigningPublicKeyLength,
     InvalidSmpPlaintextLength,
+    InvalidPfsPlaintextLength,
+    InvalidPfsType,
 
     InvalidDataLength,
 
@@ -37,6 +40,7 @@ pub enum Error {
     ProtocolViolation,
     SmpQuestionInvalidUtf8,
 
-    SMPInvalidContactProof
-
+    SMPInvalidContactProof,
+    SigVerificationFailed,
+    InvalidHashChain
 }

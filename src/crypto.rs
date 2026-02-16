@@ -170,11 +170,26 @@ pub fn generate_signature(alg: oqs::sig::Algorithm, secret_key_bytes: &[u8], dat
         .map_err(|_| Error::SigError)?;
 
     Ok(Zeroizing::new(signature.into_vec()))
-
-
-
 }
 
+pub fn verify_signature(alg: oqs::sig::Algorithm, public_key_bytes: &[u8], data: &[u8], signature_bytes: &[u8]) -> Result<(), Error> {    
+    let sigalg = oqs::sig::Sig::new(alg)
+        .map_err(|_| Error::SigError)?;
+
+    let sig_pk = sigalg
+        .public_key_from_bytes(public_key_bytes)
+        .ok_or(Error::InvalidSigPublicKey)?;
+
+    let signature = sigalg
+        .signature_from_bytes(signature_bytes)
+        .ok_or(Error::InvalidSigPublicKey)?;
+
+
+    let sig_result = sigalg.verify(data, &signature, &sig_pk)
+        .map_err(|_| Error::SigVerificationFailed)?;
+
+    Ok(sig_result)
+}
 
 
 
@@ -291,7 +306,7 @@ pub fn decrypt_shared_secrets(ciphertext_blob: &[u8], private_key_bytes: &Zeroiz
 
 pub fn hmac_sha3_512(data: &[u8], key: &Zeroizing<Vec<u8>>) -> Zeroizing<Vec<u8>> {
     let mut mac = <Hmac<Sha3_512> as Mac>::new_from_slice(&*key)
-        .expect("HMAC key length is valid");
+        .expect("HMAC key length is invalid");
 
     mac.update(data);
 
