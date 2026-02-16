@@ -12,11 +12,13 @@ pub enum Error {
 
     RandomBytesGenerationFailed,
     SizeExceedsSHA3512,
+    SigError,
     KemError,
     InvalidKemPublicKey,
     InvalidKemPublicKeyLength,
     InvalidKemSecretKey,
     InvalidKemCiphertextLength,
+    InvalidSigSecretKey,
     InvalidChaCha20PaddingLength,
     InvalidChaCha20KeyLength,
     InvalidChaCha20NonceLength,

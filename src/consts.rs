@@ -7,6 +7,11 @@ pub const ML_KEM_1024_PK_SIZE: usize = 1568;
 pub const ML_KEM_1024_CT_SIZE: usize = 1568;
 
 
+pub const CLASSIC_MCELIECE_8_SK_SIZE: usize = 14120;
+pub const CLASSIC_MCELIECE_8_PK_LEN: usize = 1357824;
+pub const CLASSIC_MCELIECE_8_CT_LEN: usize = 208; 
+
+
 pub const STRAND_KEY_SIZE: usize = 32;
 pub const STRAND_NONCE_SIZE: usize = 12;
 
@@ -15,6 +20,8 @@ pub const SMP_TYPE_INIT_SMP: u8 = 0x00;
 /// The bytes length of the SMP Argon2Id verification outputs
 pub const SMP_ANSWER_OUTPUT_SIZE: usize = 64;
 
+
+pub const PFS_TYPE_PFS_NEW: u8 = 0x01;
 
 /// Maximum nonce length for ChaCha20Poly1305 (12 bytes for IETF variant)
 pub const CHACHA20POLY1305_NONCE_LEN: usize = 12;

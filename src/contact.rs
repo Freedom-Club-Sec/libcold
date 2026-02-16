@@ -28,8 +28,17 @@ pub struct Contact {
 
     our_signing_pub_key: Option<Zeroizing<Vec<u8>>>,
     our_signing_secret_key: Option<Zeroizing<Vec<u8>>>,
-
     contact_signing_pub_key: Option<Zeroizing<Vec<u8>>>,
+    
+
+    our_ml_kem_pub_key: Option<Zeroizing<Vec<u8>>>,
+    our_ml_kem_secret_key: Option<Zeroizing<Vec<u8>>>,
+    contact_ml_kem_pub_key: Option<Zeroizing<Vec<u8>>>,
+
+    our_mceliece_pub_key: Option<Zeroizing<Vec<u8>>>,
+    our_mceliece_secret_key: Option<Zeroizing<Vec<u8>>>,
+    contact_mceliece_pub_key: Option<Zeroizing<Vec<u8>>>,
+
 
     our_smp_tmp_pub_key: Option<Zeroizing<Vec<u8>>>,
     our_smp_tmp_secret_key: Option<Zeroizing<Vec<u8>>>,
@@ -49,6 +58,9 @@ pub struct Contact {
     smp_question: Option<String>,
 
 
+    our_hash_chain: Option<Zeroizing<Vec<u8>>>,
+    contact_hash_chain: Option<Zeroizing<Vec<u8>>>,
+
     #[zeroize(skip)]
     backup: Option<Box<Contact>>
 }
@@ -57,10 +69,20 @@ pub struct Contact {
 impl Clone for Contact {
     fn clone(&self) -> Self {
         Contact {
-            state: self.state, // Copy
+            state: self.state.clone(), 
             our_signing_pub_key: self.our_signing_pub_key.clone(),
             our_signing_secret_key: self.our_signing_secret_key.clone(),
             contact_signing_pub_key: self.contact_signing_pub_key.clone(),
+
+            our_ml_kem_pub_key: self.our_ml_kem_pub_key.clone(),
+            our_ml_kem_secret_key: self.our_ml_kem_pub_key.clone(),
+            contact_ml_kem_pub_key: self.our_ml_kem_pub_key.clone(),
+
+            our_mceliece_pub_key: self.our_ml_kem_pub_key.clone(),
+            our_mceliece_secret_key: self.our_ml_kem_pub_key.clone(),
+            contact_mceliece_pub_key: self.our_ml_kem_pub_key.clone(),
+
+
 
             our_smp_tmp_pub_key: self.our_smp_tmp_pub_key.clone(),
             our_smp_tmp_secret_key: self.our_smp_tmp_secret_key.clone(),
@@ -79,6 +101,9 @@ impl Clone for Contact {
             smp_answer: self.smp_answer.clone(),
             smp_question: self.smp_question.clone(),
 
+            our_hash_chain: self.our_hash_chain.clone(),
+            contact_hash_chain: self.contact_hash_chain.clone(),
+
             backup: None, // Always reset backup in clones
         }
     }
@@ -93,6 +118,14 @@ impl Contact {
             our_smp_tmp_pub_key: None,
             our_smp_tmp_secret_key: None,
             contact_smp_tmp_pub_key: None,
+
+            our_ml_kem_pub_key: None, 
+            our_ml_kem_secret_key: None, 
+            contact_ml_kem_pub_key: None,
+
+            our_mceliece_pub_key: None,
+            our_mceliece_secret_key: None, 
+            contact_mceliece_pub_key: None,
 
             our_signing_pub_key: None,
             our_signing_secret_key: None,
@@ -109,6 +142,10 @@ impl Contact {
 
             smp_answer: None,
             smp_question: None,
+
+            our_hash_chain: None, 
+            contact_hash_chain: None,
+
             backup: None,
         };
 
@@ -500,6 +537,51 @@ impl Contact {
 
         Ok(ContactOutput::Wire(WireMessage(out)))
 
+    }
+
+    fn do_new_ephemeral_keys(&mut self) ->  Result<ContactOutput, Error> {
+        let ml_dsa_sk = self.our_signing_secret_key
+            .as_ref()
+            .ok_or(Error::InvalidState)?;
+
+        let (ml_kem_pk, ml_kem_sk) = crypto::generate_kem_keypair(oqs::kem::Algorithm::MlKem1024)
+            .map_err(|_| Error::CryptoFail)?;
+ 
+        let (mceliece_pk, mceliece_sk) = crypto::generate_kem_keypair(oqs::kem::Algorithm::ClassicMcEliece8192128)
+            .map_err(|_| Error::CryptoFail)?;
+
+
+        let our_hash_chain: Zeroizing<Vec<u8>> = match self.our_hash_chain.take() {
+            Some(v) => v,
+            None => crypto::generate_secure_random_bytes_whiten(64)?,
+        };
+
+        let our_next_hash_chain = crypto::hash_sha3_512(&our_hash_chain);
+
+        let mut pks_hash_chain = Zeroizing::new(Vec::with_capacity(64 + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_LEN ));
+        pks_hash_chain.extend_from_slice(our_next_hash_chain.as_slice());
+        pks_hash_chain.extend_from_slice(ml_kem_pk.as_slice());
+        pks_hash_chain.extend_from_slice(mceliece_pk.as_slice());
+
+        let signed_pks_hash_chain = crypto::generate_signature(oqs::sig::Algorithm::MlDsa87, ml_dsa_sk, &pks_hash_chain)?;
+
+        let mut payload = Zeroizing::new(Vec::with_capacity(
+                1 + 
+                signed_pks_hash_chain.len() +
+                pks_hash_chain.len()
+
+            ));
+
+        payload.push(consts::PFS_TYPE_PFS_NEW);
+        payload.extend_from_slice(&signed_pks_hash_chain);
+        payload.extend_from_slice(&pks_hash_chain);
+
+
+        self.our_hash_chain = Some(our_next_hash_chain);
+        let final_payload = self.prepare_payload(&payload)?;
+
+        Ok(final_payload)
+    
     }
 
 

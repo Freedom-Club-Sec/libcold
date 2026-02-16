@@ -158,6 +158,26 @@ pub fn generate_signing_keypair(alg: oqs::sig::Algorithm) -> oqs::Result<(Zeroiz
 }
 
 
+pub fn generate_signature(alg: oqs::sig::Algorithm, secret_key_bytes: &[u8], data: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {    
+    let sigalg = oqs::sig::Sig::new(alg)
+        .map_err(|_| Error::SigError)?;
+
+    let sk = sigalg
+        .secret_key_from_bytes(secret_key_bytes)
+        .ok_or(Error::InvalidSigSecretKey)?;
+
+    let signature = sigalg.sign(data, &sk)
+        .map_err(|_| Error::SigError)?;
+
+    Ok(Zeroizing::new(signature.into_vec()))
+
+
+
+}
+
+
+
+
 
 pub fn generate_kem_keypair(alg: oqs::kem::Algorithm) -> oqs::Result<(Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>)> {    
     let sigalg = oqs::kem::Kem::new(alg)?;
