@@ -82,8 +82,6 @@ impl Clone for Contact {
             our_mceliece_secret_key: self.our_mceliece_pub_key.clone(),
             contact_mceliece_pub_key: self.contact_mceliece_pub_key.clone(),
 
-
-
             our_smp_tmp_pub_key: self.our_smp_tmp_pub_key.clone(),
             our_smp_tmp_secret_key: self.our_smp_tmp_secret_key.clone(),
             contact_smp_tmp_pub_key: self.contact_smp_tmp_pub_key.clone(),
@@ -580,6 +578,12 @@ impl Contact {
         let final_payload = self.prepare_payload(&payload)?;
 
         self.our_hash_chain = Some(our_next_hash_chain);
+
+        self.our_ml_kem_pub_key = Some(ml_kem_pk);
+        self.our_ml_kem_secret_key = Some(ml_kem_sk);
+
+        self.our_mceliece_pub_key = Some(mceliece_pk);
+        self.our_mceliece_secret_key = Some(mceliece_sk);
 
 
         Ok(final_payload)
