@@ -42,5 +42,8 @@ pub enum Error {
 
     SMPInvalidContactProof,
     SigVerificationFailed,
-    InvalidHashChain
+    InvalidHashChain,
+    InvalidDataPlaintextLength,
+
+    InvalidDataType
 }

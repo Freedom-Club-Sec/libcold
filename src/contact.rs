@@ -8,7 +8,7 @@ use crate::wire::{ContactOutput, WireMessage, UserPrompt, UserAnswer};
 use crate::error::Error;
 
 // Contact states for one contact
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum ContactState {
     Uninitialized,
     SMPInit,
@@ -195,16 +195,36 @@ impl Contact {
             ContactState::SMPInit       => self.do_smp_step_3(data),
             ContactState::SMPStep2      => self.do_smp_step_4_request_answer(data),
 
-            // placeholder shit
             ContactState::SMPStep3      => self.do_smp_step_5(data),
-            ContactState::Verified      => self.do_smp_step_2(data)
+            ContactState::Verified      => self.process_verified(data)
         };
 
-        if result.is_ok() {
-            return result;
-        } else {
-            return self.do_smp_failure();
+
+        
+        if self.state != ContactState::Verified {
+            // If we are not verified, we must still be in SMP.
+            if result.is_ok() {
+                return result;
+            } else {
+                return self.do_smp_failure();
+            }
         }
+
+        result
+    }
+    
+    pub fn process_verified(&mut self, data: &[u8]) -> Result<ContactOutput, Error> {
+        let data_plaintext = self.decrypt_incoming_data(data)?;
+
+        let type_byte = data_plaintext.get(0)
+            .ok_or(Error::InvalidDataPlaintextLength)?;
+
+        if type_byte == &consts::PFS_TYPE_PFS_NEW {
+            let pfs_plaintext = data_plaintext.get(1..).ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+            return self.do_pfs_new_and_acks(pfs_plaintext);
+        }
+
+        Err(Error::InvalidDataType)
     }
 
     pub fn init_smp(&mut self, question: String, answer: String) -> Result<ContactOutput, Error> {
@@ -473,6 +493,8 @@ impl Contact {
 
         let final_payload = self.prepare_payload(&payload)?;
 
+        self.state = ContactState::Verified;
+
         Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
     }
 
@@ -523,6 +545,8 @@ impl Contact {
             return Err(Error::SMPInvalidContactProof);
         }
 
+        self.state = ContactState::Verified;
+
         self.do_new_ephemeral_keys()
     }
 
@@ -553,20 +577,7 @@ impl Contact {
     }
 
   
-    fn do_pfs_new_and_acks(&mut self, data: &[u8]) ->  Result<ContactOutput, Error> {
-        let pfs_plaintext = self.decrypt_incoming_data(data)?;
-
-        let type_byte = pfs_plaintext.get(0)
-            .ok_or(Error::InvalidPfsPlaintextLength)?;
-
-        if type_byte != &consts::PFS_TYPE_PFS_NEW {
-            return Err(Error::InvalidPfsType);
-        }
-
-        let pfs_plaintext = pfs_plaintext.get(1..)
-            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
-
-
+    fn do_pfs_new_and_acks(&mut self, pfs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
         if pfs_plaintext.len() != 64 + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_SIZE {
             return Err(Error::InvalidPfsPlaintextLength);
         }
