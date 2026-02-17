@@ -582,7 +582,7 @@ impl Contact {
 
   
     fn do_pfs_new(&mut self, pfs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
-        if pfs_plaintext.len() != 64 + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_SIZE {
+        if pfs_plaintext.len() != 64 + consts::ML_DSA_87_SIGN_SIZE + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_SIZE {
             return Err(Error::InvalidPfsPlaintextLength);
         }
 
@@ -597,7 +597,7 @@ impl Contact {
         let signature = pfs_plaintext.get(.. consts::ML_DSA_87_SIGN_SIZE)
             .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
 
-        let signature_data = pfs_plaintext.get(consts::ML_DSA_87_SIGN_SIZE + 64 ..)
+        let signature_data = pfs_plaintext.get(consts::ML_DSA_87_SIGN_SIZE ..)
             .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
 
         // Verify the signature of the public-keys and the hash-chain.
@@ -797,7 +797,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_new_smp_session() {
+    fn test_full_two_sessions() {
 
         // Alice initiates a new SMP session
         let alice_question = String::from("This is a question");
@@ -901,6 +901,20 @@ mod tests {
         };
 
         assert_eq!(result.len(), 1, "Expected exactly one wire message");
+
+        // PFS
+
+
+        let result = bob.process(result[0].as_ref());
+        println!("Bob result: {:?}", result);
+        assert!(result.is_ok());
+
+        let result = match result.unwrap() {
+            ContactOutput::Wire(w) => w,
+            _ => panic!("Expected Wire output"),
+        };
+
+        assert_eq!(result.len(), 2, "Expected exactly 2 wire messages");
 
     }
 }
