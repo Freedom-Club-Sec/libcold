@@ -1,6 +1,6 @@
 mod contact;
 mod consts;
-mod crypto;
+pub mod crypto;
 mod error;
 mod wire;
 mod smp;

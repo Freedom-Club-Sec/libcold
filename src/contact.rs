@@ -39,6 +39,11 @@ pub struct Contact {
     our_mceliece_secret_key: Option<Zeroizing<Vec<u8>>>,
     contact_mceliece_pub_key: Option<Zeroizing<Vec<u8>>>,
 
+    our_staged_ml_kem_pub_key: Option<Zeroizing<Vec<u8>>>,
+    our_staged_ml_kem_secret_key: Option<Zeroizing<Vec<u8>>>,
+
+    our_staged_mceliece_pub_key: Option<Zeroizing<Vec<u8>>>,
+    our_staged_mceliece_secret_key: Option<Zeroizing<Vec<u8>>>,
 
     our_smp_tmp_pub_key: Option<Zeroizing<Vec<u8>>>,
     our_smp_tmp_secret_key: Option<Zeroizing<Vec<u8>>>,
@@ -82,6 +87,14 @@ impl Clone for Contact {
             our_mceliece_secret_key: self.our_mceliece_pub_key.clone(),
             contact_mceliece_pub_key: self.contact_mceliece_pub_key.clone(),
 
+
+            our_staged_ml_kem_pub_key: self.our_staged_ml_kem_pub_key.clone(),
+            our_staged_ml_kem_secret_key: self.our_staged_ml_kem_secret_key.clone(),
+
+            our_staged_mceliece_pub_key: self.our_staged_mceliece_pub_key.clone(),
+            our_staged_mceliece_secret_key: self.our_staged_mceliece_secret_key.clone(),
+
+
             our_smp_tmp_pub_key: self.our_smp_tmp_pub_key.clone(),
             our_smp_tmp_secret_key: self.our_smp_tmp_secret_key.clone(),
             contact_smp_tmp_pub_key: self.contact_smp_tmp_pub_key.clone(),
@@ -124,6 +137,14 @@ impl Contact {
             our_mceliece_pub_key: None,
             our_mceliece_secret_key: None, 
             contact_mceliece_pub_key: None,
+
+
+            our_staged_ml_kem_pub_key: None, 
+            our_staged_ml_kem_secret_key: None, 
+            
+            our_staged_mceliece_pub_key: None, 
+            our_staged_mceliece_secret_key: None, 
+           
 
             our_signing_pub_key: None,
             our_signing_secret_key: None,
@@ -205,7 +226,7 @@ impl Contact {
 
         self.state = ContactState::SMPInit;
 
-        Ok(ContactOutput::Wire(WireMessage(out)))
+        Ok(ContactOutput::Wire(vec![WireMessage(out)]))
     }
      
     fn do_smp_step_2(&mut self, data: &[u8]) -> Result<ContactOutput, Error> {
@@ -270,7 +291,7 @@ impl Contact {
 
         self.state = ContactState::SMPStep2;
 
-        Ok(ContactOutput::Wire(WireMessage(out)))
+        Ok(ContactOutput::Wire(vec![WireMessage(out)]))
     }
 
     fn do_smp_step_3(&mut self, data: &[u8]) ->  Result<ContactOutput, Error> {
@@ -355,7 +376,7 @@ impl Contact {
 
         self.state = ContactState::SMPStep3;
 
-        Ok(final_payload)
+        Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
         
     }
 
@@ -452,7 +473,7 @@ impl Contact {
 
         let final_payload = self.prepare_payload(&payload)?;
 
-        Ok(final_payload)
+        Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
     }
 
 
@@ -477,15 +498,11 @@ impl Contact {
         let smp_answer = self.smp_answer.as_ref().unwrap();
         let smp_answer = smp_answer.deref().as_bytes();
 
-    
         let our_smp_tmp_pk = self.our_smp_tmp_pub_key
             .as_ref().unwrap();
         
         let our_signing_pk = self.our_signing_pub_key
             .as_ref().unwrap();
-        let contact_signing_pk = self.contact_signing_pub_key
-            .as_ref().unwrap();
-
 
         let our_smp_nonce = self.our_smp_nonce.as_ref().unwrap();
         let contact_smp_nonce = self.contact_smp_nonce.as_ref().unwrap();
@@ -532,12 +549,11 @@ impl Contact {
         out.extend_from_slice(b"failure");
 
 
-        Ok(ContactOutput::Wire(WireMessage(out)))
-
+        Ok(ContactOutput::Wire(vec![WireMessage(out)]))
     }
 
   
-    fn do_pfs_new_and_acks(&mut self, data: &[u8]) ->  Result<(ContactOutput, bool), Error> {
+    fn do_pfs_new_and_acks(&mut self, data: &[u8]) ->  Result<ContactOutput, Error> {
         let pfs_plaintext = self.decrypt_incoming_data(data)?;
 
         let type_byte = pfs_plaintext.get(0)
@@ -602,10 +618,22 @@ impl Contact {
 
         let final_payload = self.prepare_payload(&payload)?;
 
-        if !self.our_ml_kem_pub_key.is_some() || !self.our_mceliece_pub_key.is_some() {
+
+        if (!self.our_ml_kem_secret_key.is_some() || !self.our_mceliece_secret_key.is_some()) && (!self.our_staged_ml_kem_secret_key.is_some() || !self.our_staged_mceliece_secret_key.is_some()) {
+            let ephemeral = self.do_new_ephemeral_keys()?; // ephemeral: ContactOutput
+
+            let mut messages = vec![WireMessage(final_payload)];
+
+            if let ContactOutput::Wire(mut ws) = ephemeral {
+                messages.append(&mut ws); 
+            } else {
+                return Err(Error::InvalidState);
+            }
+            return Ok(ContactOutput::Wire(messages));
 
         }
-        Ok((final_payload, false))
+
+        Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
     }
 
 
@@ -620,7 +648,6 @@ impl Contact {
  
         let (mceliece_pk, mceliece_sk) = crypto::generate_kem_keypair(oqs::kem::Algorithm::ClassicMcEliece8192128)
             .map_err(|_| Error::CryptoFail)?;
-
 
         let our_hash_chain: Zeroizing<Vec<u8>> = match self.our_hash_chain.take() {
             Some(v) => v,
@@ -658,7 +685,7 @@ impl Contact {
         self.our_mceliece_pub_key = Some(mceliece_pk);
         self.our_mceliece_secret_key = Some(mceliece_sk);
 
-        Ok(final_payload)
+        Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
     
     }
 
@@ -691,7 +718,7 @@ impl Contact {
     }
 
     /// Prepapre the payload by wrap encrypting it and also continues the ratchet.
-    fn prepare_payload(&mut self, payload: &[u8]) -> Result<ContactOutput, Error> {
+    fn prepare_payload(&mut self, payload: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {
         let our_next_strand_key = crypto::generate_secure_random_bytes_whiten(32)?;
 
         let our_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::STRAND_NONCE_SIZE)?;
@@ -710,7 +737,9 @@ impl Contact {
         self.our_next_strand_key = Some(our_next_strand_key);
         self.our_next_strand_nonce = Some(our_next_strand_nonce);
 
-        Ok(ContactOutput::Wire(WireMessage(Zeroizing::new(ciphertext_blob))))
+        // Ok(ContactOutput::Wire(WireMessage(Zeroizing::new(ciphertext_blob))))
+        Ok(Zeroizing::new(ciphertext_blob))
+
     }
 
     fn init_lt_sign_keypair(&mut self) -> Result<(), Error> {
@@ -745,6 +774,8 @@ mod tests {
 
     #[test]
     fn test_new_smp_session() {
+
+        // Alice initiates a new SMP session
         let alice_question = String::from("This is a question");
         let alice_answer = String::from("This is an answer");
 
@@ -763,13 +794,15 @@ mod tests {
             _ => panic!("Expected Wire output"),
         };
 
-        assert_eq!(result.len(), 1 + consts::ML_KEM_1024_PK_SIZE, "SMP init output length mismatch");
-        assert_eq!(result[0], consts::SMP_TYPE_INIT_SMP, "SMP type byte mismatch");
+        assert_eq!(result.len(), 1, "Expected exactly one wire message");
+        assert_eq!(result[0].len(), 1 + consts::ML_KEM_1024_PK_SIZE, "SMP init output length mismatch");
+        assert_eq!(result[0][0], consts::SMP_TYPE_INIT_SMP, "SMP type byte mismatch");
 
-        
+
+        // Bob processes Alice's result.
         let mut bob = Contact::new().expect("Failed to create new contact instance");
 
-        let result = bob.process(result.as_ref());
+        let result = bob.process(result[0].as_ref());
         println!("Bob result: {:?}", result);
         assert!(result.is_ok());
 
@@ -778,15 +811,19 @@ mod tests {
             _ => panic!("Expected Wire output"),
         };
 
+        assert_eq!(result.len(), 1, "Expected exactly one wire message");
+
         assert!(
-            result.len() >= 
+            result[0].len() >= 
             1 + (consts::ML_KEM_1024_CT_SIZE * 2) + 16 + (consts::CHACHA20POLY1305_NONCE_LEN * 3) + 32 + consts::SMP_NONCE_SIZE + consts::ML_DSA_87_PK_SIZE, 
             "SMP step 2 output length mismatch"
         );
-        assert_eq!(result[0], consts::SMP_TYPE_INIT_SMP, "SMP type byte mismatch");
+        assert_eq!(result[0][0], consts::SMP_TYPE_INIT_SMP, "SMP type byte mismatch");
 
 
-        let result = alice.process(result.as_ref());
+
+        // Alice processes Bob's result.
+        let result = alice.process(result[0].as_ref());
         println!("Alice result: {:?}", result);
         assert!(result.is_ok());
 
@@ -795,8 +832,11 @@ mod tests {
             _ => panic!("Expected Wire output"),
         };
 
+        assert_eq!(result.len(), 1, "Expected exactly one wire message");
 
-        let result = bob.process(result.as_ref());
+
+        // Bob processes Alice's result.
+        let result = bob.process(result[0].as_ref());
         println!("Bob result: {:?}", result);
         assert!(result.is_ok());
 
@@ -812,7 +852,7 @@ mod tests {
 
         let bob_answer = String::from("This is an answer");
 
-        let mut bob_user_answer = UserAnswer::new(bob_answer).expect("Failed to create new UserAnswer instance");
+        let bob_user_answer = UserAnswer::new(bob_answer).expect("Failed to create new UserAnswer instance");
         
         let result = bob.provide_smp_answer(bob_user_answer);
         println!("Bob provide_smp_answer: result: {:?}", result);
@@ -824,7 +864,10 @@ mod tests {
         };
 
 
-        let result = alice.process(result.as_ref());
+        assert_eq!(result.len(), 1, "Expected exactly one wire message");
+
+
+        let result = alice.process(result[0].as_ref());
         println!("Alice result: {:?}", result);
         assert!(result.is_ok());
 
@@ -833,7 +876,7 @@ mod tests {
             _ => panic!("Expected Wire output"),
         };
 
-
+        assert_eq!(result.len(), 1, "Expected exactly one wire message");
 
     }
 }

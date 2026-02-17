@@ -40,7 +40,7 @@ impl UserAnswer {
 #[derive(Debug)]
 pub enum ContactOutput {
     None,
-    Wire(WireMessage),
+    Wire(Vec<WireMessage>),
     Prompt(UserPrompt),
 }
 
