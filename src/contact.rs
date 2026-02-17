@@ -198,8 +198,6 @@ impl Contact {
             ContactState::SMPStep3      => self.do_smp_step_5(data),
             ContactState::Verified      => self.process_verified(data)
         };
-
-
         
         if self.state != ContactState::Verified {
             // If we are not verified, we must still be in SMP.
@@ -221,8 +219,14 @@ impl Contact {
 
         if type_byte == &consts::PFS_TYPE_PFS_NEW {
             let pfs_plaintext = data_plaintext.get(1..).ok_or(Error::InvalidPfsPlaintextLength).unwrap();
-            return self.do_pfs_new_and_acks(pfs_plaintext);
+            return self.do_pfs_new(pfs_plaintext);
+        
+        } else if type_byte == &consts::PFS_TYPE_PFS_ACK {
+            let pfs_plaintext = data_plaintext.get(1..).ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+            return self.do_pfs_ack(pfs_plaintext);
         }
+
+
 
         Err(Error::InvalidDataType)
     }
@@ -577,7 +581,7 @@ impl Contact {
     }
 
   
-    fn do_pfs_new_and_acks(&mut self, pfs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
+    fn do_pfs_new(&mut self, pfs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
         if pfs_plaintext.len() != 64 + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_SIZE {
             return Err(Error::InvalidPfsPlaintextLength);
         }
@@ -647,6 +651,15 @@ impl Contact {
         Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
     }
 
+    fn do_pfs_ack(&mut self, pfs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
+        self.our_ml_kem_secret_key = self.our_staged_ml_kem_secret_key.take();
+        self.our_ml_kem_pub_key = self.our_staged_ml_kem_pub_key.take();
+
+        self.our_mceliece_secret_key = self.our_staged_mceliece_secret_key.take();
+        self.our_mceliece_pub_key = self.our_staged_mceliece_pub_key.take();
+
+        Ok(ContactOutput::None)
+    }
 
 
     fn do_new_ephemeral_keys(&mut self) ->  Result<ContactOutput, Error> {
