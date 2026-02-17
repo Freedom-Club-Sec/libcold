@@ -661,7 +661,6 @@ impl Contact {
         Ok(ContactOutput::None)
     }
 
-
     fn do_new_ephemeral_keys(&mut self) ->  Result<ContactOutput, Error> {
         let ml_dsa_sk = self.our_signing_secret_key
             .as_ref()
@@ -904,7 +903,6 @@ mod tests {
 
         // PFS
 
-
         let result = bob.process(result[0].as_ref());
         println!("Bob result: {:?}", result);
         assert!(result.is_ok());
@@ -915,6 +913,41 @@ mod tests {
         };
 
         assert_eq!(result.len(), 2, "Expected exactly 2 wire messages");
+
+
+        let result_1 = alice.process(result[0].as_ref());
+        println!("Alice result 1: {:?}", result_1);
+        assert!(result_1.is_ok());
+
+        let result_1 = match result_1.unwrap() {
+            ContactOutput::None => {},
+            _ => panic!("Expected None output"),
+        };
+        
+
+        let result_2 = alice.process(result[1].as_ref());
+        println!("Alice result 1: {:?}", result_2);
+        assert!(result_2.is_ok());
+
+        let result_2 = match result_2.unwrap() {
+            ContactOutput::Wire(w) => w,
+            _ => panic!("Expected Wire output"),
+        };
+
+
+        assert_eq!(result_2.len(), 2, "Expected exactly 2 wire messages");
+
+
+
+        let result = bob.process(result_2[0].as_ref());
+        println!("Bob result: {:?}", result);
+        assert!(result.is_ok());
+
+        let result = match result.unwrap() {
+            ContactOutput::None => {},
+            _ => panic!("Expected None output"),
+        };
+
 
     }
 }
