@@ -791,17 +791,35 @@ impl Contact {
         let contact_mceliece_pk = self.contact_mceliece_pub_key
             .as_ref().ok_or(Error::UninitializedContactKeys)?;
 
+
+
+        let mut messages = vec![];
+            
         // We have no pads (Either None or Empty vec).
         if self.our_pads.as_ref().map_or(true, |v| v.is_empty()) {
-            // TODO: Figure way to uhh return this early / save it or something u know what i mean
-            // like i did in ephemeral func end
-            self.do_generate_otpads()?;
+            let ephemeral = self.do_generate_otpads()?;
+
+            if let ContactOutput::Wire(mut ws) = ephemeral {
+                messages.append(&mut ws); 
+            }
         }
 
-        let our_pads = self.our_pads.as_ref().unwrap();
+        let mut our_pads = self.our_pads.as_ref().unwrap();
 
-
-        let (message_encrypted, new_pads) = crypto::otp_encrypt_with_padding(message.as_bytes(), our_pads)?;
+        // We do this to ensure if our pads are not enough for the padded message, we simply
+        // generate new pads.
+        
+        let (message_encrypted, new_pads) = match crypto::otp_encrypt_with_padding(message.as_bytes(), our_pads) {
+            Ok((ct, np)) => (ct, np),
+            Err(_) => {
+                let ephemeral = self.do_generate_otpads()?;
+                if let ContactOutput::Wire(mut ws) = ephemeral {
+                    messages.append(&mut ws);
+                }
+                our_pads = self.our_pads.as_ref().unwrap();
+                crypto::otp_encrypt_with_padding(message.as_bytes(), our_pads)?
+            }
+        };
 
         // Truncate pads
         self.our_pads = Some(Zeroizing::new(new_pads));
@@ -816,7 +834,10 @@ impl Contact {
 
         let final_payload = self.prepare_payload(&payload)?;
 
-        Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
+        messages.push(WireMessage(final_payload));
+
+        Ok(ContactOutput::Wire(messages))
+        // Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
 
     }
 
