@@ -156,6 +156,8 @@ pub fn otp_encrypt_with_padding(plaintext: &[u8], key: &[u8]) -> Result<(Vec<u8>
 }
 
 
+
+/// This doesnt return truncated pads, its up to caller to truncate his pads.
 pub fn otp_decrypt_with_padding(ciphertext: &[u8], key: &[u8]) -> Result<Vec<u8>, Error> {
     let (plaintext_with_padding, _) = one_time_pad(ciphertext, key)?;
 
@@ -307,7 +309,6 @@ pub fn generate_shared_secrets(public_key_bytes: &[u8], algorithm: oqs::kem::Alg
         let (ct, ss) = kem.encapsulate(&pk_ref)
             .map_err(|_| Error::KemError)?;
 
-        // Use AsRef<[u8]> instead of as_bytes()
         ciphertexts.extend_from_slice(ct.as_ref());
 
         let remaining = size - shared_secrets.len();
@@ -505,11 +506,25 @@ mod tests {
 
         assert_ne!(pads.as_slice(), new_pads, "Pads and new_pads are equal");
         
-        assert_eq!(decrypted_pt.len(), plaintext.len(), "Original plaintext length and decrypted plaintext length not equal");
-
-        assert_eq!(decrypted_pt, plaintext, "Original plaintext and decrypted plaintext not equal");
+        assert_eq!(decrypted_pt, plaintext, "Decrypted plaintext and original plaintext are not equal");
     }
 
+    #[test]
+    fn test_otp_with_padding() {
+        let plaintext = b"Hello world!";
+        let pads = generate_secure_random_bytes(70).unwrap();
 
+        let (ct, new_pads) = otp_encrypt_with_padding(plaintext, &pads).unwrap();
+
+        assert_eq!(ct.len(), consts::OTP_MAX_BUCKET, "Bucket padding does not match OTP_MAX_BUCKET");
+
+        assert_ne!(ct, new_pads, "Ciphertext and new_pads are equal");
+        assert_ne!(pads.as_slice(), new_pads, "Pads and new_pads are equal");
+
+
+        let decrypted_pt = otp_decrypt_with_padding(&ct, &pads).unwrap();
+
+        assert_eq!(decrypted_pt, plaintext, "Decrypted plaintext and original plaintext are not equal");
+    }
 
 }
