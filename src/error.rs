@@ -10,6 +10,8 @@ pub enum Error {
     SMPAnswerEmpty,
     SMPnonceDuplicated,
 
+    UninitializedContactKeys,
+
     RandomBytesGenerationFailed,
     SizeExceedsSHA3512,
     SigError,
@@ -45,5 +47,8 @@ pub enum Error {
     InvalidHashChain,
     InvalidDataPlaintextLength,
 
-    InvalidDataType
+    InvalidDataType,
+
+    OTPKeyTooShort,
+    InvalidOTPCiphertext
 }

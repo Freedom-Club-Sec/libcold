@@ -768,8 +768,8 @@ impl Contact {
 
         let final_payload = self.prepare_payload(&payload)?;
 
-        let (our_pads, _) = crypto::one_time_pad(&ml_kem_secrets, &mceliece_secrets);
-        let (our_pads, _) = crypto::one_time_pad(our_pads.as_slice(), &chacha_shared_secrets);
+        let (our_pads, _) = crypto::one_time_pad(&ml_kem_secrets, &mceliece_secrets)?;
+        let (our_pads, _) = crypto::one_time_pad(our_pads.as_slice(), &chacha_shared_secrets)?;
 
         self.our_next_strand_key = Some(Zeroizing::new(our_pads.get(..32).unwrap().to_vec()));
 
@@ -786,15 +786,25 @@ impl Contact {
             return Err(Error::InvalidState);
         }
 
+        let contact_ml_kem_pk = self.contact_ml_kem_pub_key
+            .as_ref().ok_or(Error::UninitializedContactKeys)?;
+
+        let contact_mceliece_pk = self.contact_mceliece_pub_key
+            .as_ref().ok_or(Error::UninitializedContactKeys)?;
 
         // We have no pads (Either None or Empty vec).
         if self.our_pads.as_ref().map_or(true, |v| v.is_empty()) {
-
+            // TODO: Figure way to uhh return this early / save it or something u know what i mean
+            // like i did in ephemeral func end
+            self.do_generate_otpads()?;
         }
 
-    }
-    */
+        let our_pads = self.our_pads.as_ref().unwrap();
 
+
+
+    }
+*/
 
     fn decrypt_incoming_data(&mut self, blob: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {
         let contact_strand_key = self.contact_next_strand_key.as_ref().unwrap();

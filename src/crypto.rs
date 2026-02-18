@@ -119,12 +119,69 @@ pub fn decrypt_chacha20poly1305(key_bytes: &Zeroizing<Vec<u8>>, nonce_bytes: &[u
     Ok(Zeroizing::new(plaintext))
 }
 
-pub fn one_time_pad(plaintext: &[u8], key: &[u8]) -> (Vec<u8>, Vec<u8>) {
+
+pub fn one_time_pad(plaintext: &[u8], key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error> {
+    if plaintext.len() > key.len() {
+        return Err(Error::OTPKeyTooShort);
+    }
+
     let otpd: Vec<u8> = plaintext.iter().zip(key.iter()).map(|(&p,&k)| p^k).collect();
     let remaining_key = key[otpd.len()..].to_vec();
-    (otpd, remaining_key)
+
+    Ok((otpd, remaining_key))
 }
 
+pub fn otp_encrypt_with_padding(plaintext: &[u8], key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error> {
+    let pad_len = if plaintext.len() <= consts::OTP_MAX_BUCKET - consts::OTP_SIZE_LENGTH {
+        consts::OTP_MAX_BUCKET - consts::OTP_SIZE_LENGTH - plaintext.len()
+    } else {
+        rand::random_range(0..=consts::OTP_MAX_RANDOM_PAD)
+    };
+
+    let padding = generate_secure_random_bytes(pad_len)?;
+
+    let plaintext_len_bytes = (plaintext.len() as u64)
+        .to_be_bytes()[8 - consts::OTP_SIZE_LENGTH..]
+        .to_vec();
+
+    let mut padded_plaintext = Vec::with_capacity(
+        consts::OTP_SIZE_LENGTH + plaintext.len() + pad_len,
+    );
+
+    padded_plaintext.extend_from_slice(&plaintext_len_bytes);
+    padded_plaintext.extend_from_slice(plaintext);
+    padded_plaintext.extend_from_slice(&padding);
+
+    one_time_pad(&padded_plaintext, key)
+}
+
+
+pub fn otp_decrypt_with_padding(ciphertext: &[u8], key: &[u8]) -> Result<Vec<u8>, Error> {
+    let (plaintext_with_padding, _) = one_time_pad(ciphertext, key)?;
+
+    if plaintext_with_padding.len() < consts::OTP_SIZE_LENGTH {
+        return Err(Error::InvalidOTPCiphertext);
+    }
+
+    let mut len_buf = [0u8; 8];
+    len_buf[8 - consts::OTP_SIZE_LENGTH..]
+        .copy_from_slice(&plaintext_with_padding[..consts::OTP_SIZE_LENGTH]);
+
+    let plaintext_len = u64::from_be_bytes(len_buf) as usize;
+
+    if plaintext_len == 0 {
+        return Err(Error::InvalidOTPCiphertext);
+    }
+
+
+    if consts::OTP_SIZE_LENGTH + plaintext_len > plaintext_with_padding.len() {
+        return Err(Error::InvalidOTPCiphertext);
+    }
+
+    let plaintext_without_padding = plaintext_with_padding[consts::OTP_SIZE_LENGTH..consts::OTP_SIZE_LENGTH + plaintext_len].to_vec();
+
+    Ok(plaintext_without_padding)
+}
 
 pub fn hash_argon2id(plaintext: &[u8], salt: &[u8]) -> Result<Vec<u8>, Error> {
     let mut output_key_material = [0u8; consts::ARGON2ID_OUTPUT_LEN];
@@ -425,5 +482,34 @@ mod tests {
         assert_ne!(nonce_2.as_slice(), nonce_1.as_slice(), "Nonce returned by function equals to nonce_1. Hardcoded nonce?");
 
     }
+
+
+
+    #[test]
+    fn test_otp_without_padding() {
+        let plaintext = b"Hello world!";
+        let pads = generate_secure_random_bytes(32).unwrap();
+
+        let (ct, new_pads) = one_time_pad(plaintext, &pads).unwrap();
+        assert_ne!(ct, plaintext, "Ciphertext and plaintext are equal");
+        assert_ne!(new_pads, plaintext, "new_pads and plaintext are equal");
+        assert_ne!(ct, new_pads, "Ciphertext and new_pads are equal");
+        
+        assert_ne!(pads.as_slice(), new_pads, "Pads and new_pads are equal");
+
+        assert_eq!(ct.len(), plaintext.len(), "Ciphertext length and plaintext length not equal");
+
+        let (decrypted_pt, new_pads) = one_time_pad(&ct, &pads).unwrap();
+        assert_ne!(new_pads, decrypted_pt, "new_pads and decrypted plaintext are equal");
+        assert_ne!(ct, new_pads, "Ciphertext and new_pads are equal");
+
+        assert_ne!(pads.as_slice(), new_pads, "Pads and new_pads are equal");
+        
+        assert_eq!(decrypted_pt.len(), plaintext.len(), "Original plaintext length and decrypted plaintext length not equal");
+
+        assert_eq!(decrypted_pt, plaintext, "Original plaintext and decrypted plaintext not equal");
+    }
+
+
 
 }
