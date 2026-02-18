@@ -119,6 +119,11 @@ pub fn decrypt_chacha20poly1305(key_bytes: &Zeroizing<Vec<u8>>, nonce_bytes: &[u
     Ok(Zeroizing::new(plaintext))
 }
 
+pub fn one_time_pad(plaintext: &[u8], key: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    let otpd: Vec<u8> = plaintext.iter().zip(key.iter()).map(|(&p,&k)| p^k).collect();
+    let remaining_key = key[otpd.len()..].to_vec();
+    (otpd, remaining_key)
+}
 
 
 pub fn hash_argon2id(plaintext: &[u8], salt: &[u8]) -> Result<Vec<u8>, Error> {
@@ -193,10 +198,9 @@ pub fn verify_signature(alg: oqs::sig::Algorithm, public_key_bytes: &[u8], data:
 
 
 
-
 pub fn generate_kem_keypair(alg: oqs::kem::Algorithm) -> oqs::Result<(Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>)> {    
-    let sigalg = oqs::kem::Kem::new(alg)?;
-    let (pk, sk) = sigalg.keypair()?;
+    let kemalg = oqs::kem::Kem::new(alg)?;
+    let (pk, sk) = kemalg.keypair()?;
     
     Ok((Zeroizing::new(pk.as_ref().to_vec()), Zeroizing::new(sk.as_ref().to_vec())))
 }

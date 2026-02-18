@@ -62,6 +62,8 @@ pub struct Contact {
     smp_answer: Option<Zeroizing<String>>,
     smp_question: Option<String>,
 
+    our_pads: Option<Zeroizing<Vec<u8>>>,
+    contact_pads: Option<Zeroizing<Vec<u8>>>,
 
     our_hash_chain: Option<Zeroizing<Vec<u8>>>,
     contact_hash_chain: Option<Zeroizing<Vec<u8>>>,
@@ -112,6 +114,9 @@ impl Clone for Contact {
             smp_answer: self.smp_answer.clone(),
             smp_question: self.smp_question.clone(),
 
+            our_pads: self.our_pads.clone(),
+            contact_pads: self.contact_pads.clone(),
+
             our_hash_chain: self.our_hash_chain.clone(),
             contact_hash_chain: self.contact_hash_chain.clone(),
 
@@ -161,6 +166,9 @@ impl Contact {
 
             smp_answer: None,
             smp_question: None,
+
+            our_pads: None,
+            contact_pads: None,
 
             our_hash_chain: None, 
             contact_hash_chain: None,
@@ -458,6 +466,12 @@ impl Contact {
         let smp_answer = zeroized_str.deref().as_bytes();
 
 
+        // Failsafe to protect against retarded callers
+        if self.state != ContactState::SMPStep2 {
+            return Err(Error::InvalidState);
+        }
+
+
         let our_signing_pk = self.our_signing_pub_key.as_ref().unwrap();
         let contact_signing_pk = self.contact_signing_pub_key.as_ref().unwrap();
 
@@ -635,7 +649,8 @@ impl Contact {
 
 
         if (!self.our_ml_kem_secret_key.is_some() || !self.our_mceliece_secret_key.is_some()) && (!self.our_staged_ml_kem_secret_key.is_some() || !self.our_staged_mceliece_secret_key.is_some()) {
-            let ephemeral = self.do_new_ephemeral_keys()?; // ephemeral: ContactOutput
+            println!("######################### Uhm, WE SENDING EPHEMERAL KEYS!!!!11");
+            let ephemeral = self.do_new_ephemeral_keys()?;
 
             let mut messages = vec![WireMessage(final_payload)];
 
@@ -702,18 +717,84 @@ impl Contact {
 
         self.our_hash_chain = Some(our_next_hash_chain);
 
-        self.our_ml_kem_pub_key = Some(ml_kem_pk);
-        self.our_ml_kem_secret_key = Some(ml_kem_sk);
+        self.our_staged_ml_kem_pub_key = Some(ml_kem_pk);
+        self.our_staged_ml_kem_secret_key = Some(ml_kem_sk);
 
-        self.our_mceliece_pub_key = Some(mceliece_pk);
-        self.our_mceliece_secret_key = Some(mceliece_sk);
+        self.our_staged_mceliece_pub_key = Some(mceliece_pk);
+        self.our_staged_mceliece_secret_key = Some(mceliece_sk);
 
         Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
     
     }
 
+    fn do_generate_otpads(&mut self) ->  Result<ContactOutput, Error>  {
+        let ml_dsa_sk = self.our_signing_secret_key
+            .as_ref().unwrap();
 
-    pub fn send_message(&mut self, _plaintext: &[u8]) -> Result<Vec<u8>, Error> { Ok(vec![]) }
+        let contact_ml_kem_pk = self.contact_ml_kem_pub_key
+            .as_ref().unwrap();
+
+        let contact_mceliece_pk = self.contact_mceliece_pub_key
+            .as_ref().unwrap();
+
+        let (ml_kem_ciphertexts, ml_kem_secrets) = crypto::generate_shared_secrets(&contact_ml_kem_pk, oqs::kem::Algorithm::MlKem1024, consts::OTP_PAD_SIZE)?;
+        let (mceliece_ciphertexts, mceliece_secrets) = crypto::generate_shared_secrets(&contact_mceliece_pk, oqs::kem::Algorithm::ClassicMcEliece8192128, consts::OTP_PAD_SIZE)?;
+
+        let mut chacha_shared_secrets = Vec::new();
+
+        while chacha_shared_secrets.len() < consts::OTP_PAD_SIZE {
+            let random_bytes = crypto::generate_secure_random_bytes_whiten(64)?;
+            chacha_shared_secrets.extend_from_slice(&random_bytes);
+        }
+
+        let mut otp_batch_plain = Zeroizing::new(Vec::with_capacity(consts::ML_KEM_1024_CT_SIZE + consts::CLASSIC_MCELIECE_8_CT_SIZE ));
+        otp_batch_plain.extend_from_slice(ml_kem_ciphertexts.as_slice());
+        otp_batch_plain.extend_from_slice(mceliece_ciphertexts.as_slice());
+
+        let otp_batch_signature = crypto::generate_signature(oqs::sig::Algorithm::MlDsa87, ml_dsa_sk, &otp_batch_plain)?;
+
+        otp_batch_plain.extend_from_slice(chacha_shared_secrets.as_slice());
+
+        let mut payload = Zeroizing::new(Vec::with_capacity(
+                1 + 
+                otp_batch_signature.len() +
+                otp_batch_plain.len()
+
+            ));
+
+        payload.push(consts::MSG_TYPE_MSG_BATCH);
+        payload.extend_from_slice(&otp_batch_signature);
+        payload.extend_from_slice(&otp_batch_plain);
+
+        let final_payload = self.prepare_payload(&payload)?;
+
+        let (our_pads, _) = crypto::one_time_pad(&ml_kem_secrets, &mceliece_secrets);
+        let (our_pads, _) = crypto::one_time_pad(our_pads.as_slice(), &chacha_shared_secrets);
+
+        self.our_next_strand_key = Some(Zeroizing::new(our_pads.get(..32).unwrap().to_vec()));
+
+        self.our_pads = Some(Zeroizing::new(our_pads.get(32..).unwrap().to_vec()));
+
+        Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
+    }
+
+
+    /*
+    pub fn send_message(&mut self, message: Zeroizing<String>) ->  Result<ContactOutput, Error> {
+        // Failsafe to protect against retarded callers
+        if self.state != ContactState::Verified {
+            return Err(Error::InvalidState);
+        }
+
+
+        // We have no pads (Either None or Empty vec).
+        if self.our_pads.as_ref().map_or(true, |v| v.is_empty()) {
+
+        }
+
+    }
+    */
+
 
     fn decrypt_incoming_data(&mut self, blob: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {
         let contact_strand_key = self.contact_next_strand_key.as_ref().unwrap();
@@ -926,7 +1007,7 @@ mod tests {
         
 
         let result_2 = alice.process(result[1].as_ref());
-        println!("Alice result 1: {:?}", result_2);
+        println!("Alice result 2: {:?}", result_2);
         assert!(result_2.is_ok());
 
         let result_2 = match result_2.unwrap() {
@@ -935,9 +1016,7 @@ mod tests {
         };
 
 
-        assert_eq!(result_2.len(), 2, "Expected exactly 2 wire messages");
-
-
+        assert_eq!(result_2.len(), 1, "Expected exactly one wire message");
 
         let result = bob.process(result_2[0].as_ref());
         println!("Bob result: {:?}", result);

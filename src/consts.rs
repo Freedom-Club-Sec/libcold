@@ -46,6 +46,9 @@ pub const ARGON2ID_ITERS: u32 = 3;
 
 pub const ARGON2ID_LANES: u32 = 1;
 
-
 pub const ARGON2ID_OUTPUT_LEN: usize = 64;
 
+pub const OTP_PAD_SIZE: usize = 11264;
+
+
+pub const MSG_TYPE_MSG_BATCH: u8 = 0x03;
