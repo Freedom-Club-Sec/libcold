@@ -56,3 +56,4 @@ pub const OTP_SIZE_LENGTH: usize = 2;
 pub const OTP_MAX_MESSAGE_LEN: usize = OTP_PAD_SIZE - OTP_SIZE_LENGTH;
 
 pub const MSG_TYPE_MSG_BATCH: u8 = 0x03;
+pub const MSG_TYPE_MSG_NEW: u8 = 0x04;

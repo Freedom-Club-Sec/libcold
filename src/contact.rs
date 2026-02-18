@@ -466,7 +466,7 @@ impl Contact {
         let smp_answer = zeroized_str.deref().as_bytes();
 
 
-        // Failsafe to protect against retarded callers
+        // Failsafe to protect retarded callers
         if self.state != ContactState::SMPStep2 {
             return Err(Error::InvalidState);
         }
@@ -779,9 +779,8 @@ impl Contact {
     }
 
 
-    /*
-    pub fn send_message(&mut self, message: Zeroizing<String>) ->  Result<ContactOutput, Error> {
-        // Failsafe to protect against retarded callers
+    pub fn send_message(&mut self, message: &Zeroizing<String>) ->  Result<ContactOutput, Error> {
+        // Failsafe to protect retarded callers
         if self.state != ContactState::Verified {
             return Err(Error::InvalidState);
         }
@@ -802,9 +801,24 @@ impl Contact {
         let our_pads = self.our_pads.as_ref().unwrap();
 
 
+        let (message_encrypted, new_pads) = crypto::otp_encrypt_with_padding(message.as_bytes(), our_pads)?;
+
+        // Truncate pads
+        self.our_pads = Some(Zeroizing::new(new_pads));
+
+        let mut payload = Zeroizing::new(Vec::with_capacity(
+                1 + 
+                message_encrypted.len()
+            ));
+
+        payload.push(consts::MSG_TYPE_MSG_NEW);
+        payload.extend_from_slice(&message_encrypted);
+
+        let final_payload = self.prepare_payload(&payload)?;
+
+        Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
 
     }
-*/
 
     fn decrypt_incoming_data(&mut self, blob: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {
         let contact_strand_key = self.contact_next_strand_key.as_ref().unwrap();

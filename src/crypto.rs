@@ -510,7 +510,7 @@ mod tests {
     }
 
     #[test]
-    fn test_otp_with_padding() {
+    fn test_otp_with_padding_small() {
         let plaintext = b"Hello world!";
         let pads = generate_secure_random_bytes(70).unwrap();
 
