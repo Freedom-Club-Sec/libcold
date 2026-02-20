@@ -603,8 +603,10 @@ impl Contact {
         out.push(consts::SMP_TYPE_INIT_SMP);
         out.extend_from_slice(b"failure");
 
+        
+        let (ciphertext_blob, _) = crypto::encrypt_chacha20poly1305(&our_strand_key, &out, Some(our_strand_nonce.as_slice()), consts::CHACHA20POLY1305_MAX_RANDOM_PAD)?;
 
-        Ok(ContactOutput::Wire(vec![WireMessage(out)]))
+        Ok(ContactOutput::Wire(vec![WireMessage(Zeroizing::new(ciphertext_blob))]))
     }
 
   
@@ -797,11 +799,6 @@ impl Contact {
             return Err(Error::InvalidState);
         }
 
-        let contact_ml_kem_pk = self.contact_ml_kem_pub_key
-            .as_ref().ok_or(Error::UninitializedContactKeys)?;
-
-        let contact_mceliece_pk = self.contact_mceliece_pub_key
-            .as_ref().ok_or(Error::UninitializedContactKeys)?;
 
         let mut messages = vec![];
             
