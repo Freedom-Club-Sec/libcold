@@ -39,7 +39,9 @@ impl UserAnswer {
 
 
 #[derive(Debug)]
-pub struct NewMessage(pub Zeroizing<String>);
+pub struct NewMessage{
+    pub message: Zeroizing<String>
+}
 
 #[derive(Debug)]
 pub enum ContactOutput {

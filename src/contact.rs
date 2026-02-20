@@ -86,7 +86,7 @@ impl Clone for Contact {
             contact_ml_kem_pub_key: self.contact_ml_kem_pub_key.clone(),
 
             our_mceliece_pub_key: self.our_mceliece_pub_key.clone(),
-            our_mceliece_secret_key: self.our_mceliece_pub_key.clone(),
+            our_mceliece_secret_key: self.our_mceliece_secret_key.clone(),
             contact_mceliece_pub_key: self.contact_mceliece_pub_key.clone(),
 
 
@@ -234,9 +234,19 @@ impl Contact {
             let pfs_plaintext = data_plaintext.get(1..)
                 .ok_or(Error::InvalidPfsPlaintextLength)?;
             return self.do_pfs_ack(pfs_plaintext);
+        
+        } else if type_byte == &consts::MSG_TYPE_MSG_BATCH {
+            let msgs_plaintext = data_plaintext.get(1..)
+                .ok_or(Error::InvalidMsgsPlaintextLength)?;
+
+            return self.do_process_otp_batch(msgs_plaintext);
+
+        } else if type_byte == &consts::MSG_TYPE_MSG_NEW {
+            let msgs_plaintext = data_plaintext.get(1..)
+                .ok_or(Error::InvalidMsgsPlaintextLength)?;
+
+            return self.do_process_new_msg(msgs_plaintext);
         }
-
-
 
         Err(Error::InvalidDataType)
     }
@@ -738,8 +748,6 @@ impl Contact {
         let contact_mceliece_pk = self.contact_mceliece_pub_key
             .as_ref().unwrap();
 
-    
-        println!("Wtf? {} {}", contact_ml_kem_pk.len(), contact_mceliece_pk.len());
         
         let (ml_kem_ciphertexts, ml_kem_secrets) = crypto::generate_shared_secrets(&contact_ml_kem_pk, oqs::kem::Algorithm::MlKem1024, consts::OTP_PAD_SIZE)?;
         let (mceliece_ciphertexts, mceliece_secrets) = crypto::generate_shared_secrets(&contact_mceliece_pk, oqs::kem::Algorithm::ClassicMcEliece8192128, consts::OTP_PAD_SIZE)?;
@@ -882,7 +890,7 @@ impl Contact {
             .ok_or(Error::InvalidMsgsPlaintextLength)?;
 
         let batch_mceliece_ciphertext = batch_ciphertext
-            .get(consts::CLASSIC_MCELIECE_8_CT_SIZE * (consts::OTP_PAD_SIZE / 32) ..)
+            .get(consts::ML_KEM_1024_CT_SIZE * (consts::OTP_PAD_SIZE / 32) .. )
             .ok_or(Error::InvalidMsgsPlaintextLength)?;
 
 
@@ -903,6 +911,9 @@ impl Contact {
             .ok_or(Error::InvalidMsgsPlaintextLength)?;
 
 
+        self.contact_next_strand_key = Some(Zeroizing::new(contact_next_strand_key.to_vec()));
+        self.contact_pads = Some(Zeroizing::new(contact_pads.to_vec()));
+
         // PFS.
         let final_payload = self.do_new_ephemeral_keys()?;
 
@@ -913,11 +924,6 @@ impl Contact {
 
 
     fn do_process_new_msg(&mut self, msgs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
-        if msgs_plaintext.len() < consts::OTP_MAX_BUCKET + 1 {
-            return Err(Error::InvalidMsgsPlaintextLength);
-        }
-
-
         let mut contact_pads = self.contact_pads
             .take()
             .ok_or(Error::UninitializedContactKeys)?;
@@ -941,7 +947,11 @@ impl Contact {
         let remaining_pads = contact_pads.split_off(msgs_plaintext.len());
         self.contact_pads = Some(Zeroizing::new(remaining_pads));
 
-        Ok(ContactOutput::Message(NewMessage(message_utf_8)))
+        Ok(ContactOutput::Message(
+                NewMessage{
+                    message: message_utf_8
+                }
+            ))
     }
 
 
@@ -1191,8 +1201,31 @@ mod tests {
             _ => panic!("Expected Wire output"),
         };
 
+  
+        // 2 because we never sent pads to Bob yet.
+        assert_eq!(result.len(), 2, "Expected exactly 2 wire message");
 
 
+        let result_1 = bob.process(result[0].as_ref());
+        println!("Bob result 1: {:?}", result_1);
+        assert!(result_1.is_ok());
+
+        let result_1 = match result_1.unwrap() {
+            ContactOutput::Wire(w) => w,
+            _ => panic!("Expected Wire output"),
+        };
+        
+
+        let result_2 = bob.process(result[1].as_ref());
+        println!("Bob result 2: {:?}", result_2);
+        assert!(result_2.is_ok());
+
+        let result_2 = match result_2.unwrap() {
+            ContactOutput::Message(m) => m,
+            _ => panic!("Expected Message output"),
+        };
+
+        assert_eq!(alice_message, result_2.message, "Decrypted message not equal to original message");
 
     }
 }
