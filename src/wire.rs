@@ -37,11 +37,16 @@ impl UserAnswer {
     }
 }
 
+
+#[derive(Debug)]
+pub struct NewMessage(pub Zeroizing<String>);
+
 #[derive(Debug)]
 pub enum ContactOutput {
     None,
     Wire(Vec<WireMessage>),
     Prompt(UserPrompt),
+    Message(NewMessage)
 }
 
 

@@ -4,7 +4,7 @@ use std::ops::Deref;
 use crate::consts;
 use crate::crypto;
 use crate::smp;
-use crate::wire::{ContactOutput, WireMessage, UserPrompt, UserAnswer};
+use crate::wire::{ContactOutput, WireMessage, UserPrompt, UserAnswer, NewMessage};
 use crate::error::Error;
 
 // Contact states for one contact
@@ -603,7 +603,6 @@ impl Contact {
             return Err(Error::InvalidPfsPlaintextLength);
         }
 
-
         let contact_signing_pk = self.contact_signing_pub_key
             .as_ref().unwrap();
 
@@ -627,7 +626,7 @@ impl Contact {
         let contact_ml_kem_pk = pfs_plaintext.get(64 + consts::ML_DSA_87_SIGN_SIZE .. 64 + consts::ML_DSA_87_SIGN_SIZE + consts::ML_KEM_1024_PK_SIZE)
             .ok_or(Error::InvalidPfsPlaintextLength)?;
 
-        let contact_mceliece_pk = pfs_plaintext.get(64 + consts::ML_DSA_87_SIGN_SIZE + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_SIZE ..)
+        let contact_mceliece_pk = pfs_plaintext.get(64 + consts::ML_DSA_87_SIGN_SIZE + consts::ML_KEM_1024_PK_SIZE ..)
             .ok_or(Error::InvalidPfsPlaintextLength)?;
 
 
@@ -739,6 +738,9 @@ impl Contact {
         let contact_mceliece_pk = self.contact_mceliece_pub_key
             .as_ref().unwrap();
 
+    
+        println!("Wtf? {} {}", contact_ml_kem_pk.len(), contact_mceliece_pk.len());
+        
         let (ml_kem_ciphertexts, ml_kem_secrets) = crypto::generate_shared_secrets(&contact_ml_kem_pk, oqs::kem::Algorithm::MlKem1024, consts::OTP_PAD_SIZE)?;
         let (mceliece_ciphertexts, mceliece_secrets) = crypto::generate_shared_secrets(&contact_mceliece_pk, oqs::kem::Algorithm::ClassicMcEliece8192128, consts::OTP_PAD_SIZE)?;
 
@@ -901,11 +903,48 @@ impl Contact {
             .ok_or(Error::InvalidMsgsPlaintextLength)?;
 
 
+        // PFS.
         let final_payload = self.do_new_ephemeral_keys()?;
 
         Ok(final_payload)
 
     }
+
+
+
+    fn do_process_new_msg(&mut self, msgs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
+        if msgs_plaintext.len() < consts::OTP_MAX_BUCKET + 1 {
+            return Err(Error::InvalidMsgsPlaintextLength);
+        }
+
+
+        let mut contact_pads = self.contact_pads
+            .take()
+            .ok_or(Error::UninitializedContactKeys)?;
+
+
+        if msgs_plaintext.len() > contact_pads.len() {
+            // If this happens, contact has corrupted OTP state and forgot to send us a message.
+            return Err(Error::CorruptedOTPState);
+        }
+
+
+        let pads_to_be_consumed = &contact_pads[..msgs_plaintext.len()];
+
+        let message_decrypted = crypto::otp_decrypt_with_padding(msgs_plaintext, pads_to_be_consumed)?;
+
+        let message_utf_8 = Zeroizing::new(String::from_utf8(message_decrypted)
+            .map_err(|_| Error::MessageInvalidUtf8)?);
+
+
+        // Consume the used pads.
+        let remaining_pads = contact_pads.split_off(msgs_plaintext.len());
+        self.contact_pads = Some(Zeroizing::new(remaining_pads));
+
+        Ok(ContactOutput::Message(NewMessage(message_utf_8)))
+    }
+
+
 
     fn decrypt_incoming_data(&mut self, blob: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {
         let contact_strand_key = self.contact_next_strand_key.as_ref().unwrap();
@@ -1137,6 +1176,22 @@ mod tests {
             ContactOutput::None => {},
             _ => panic!("Expected None output"),
         };
+
+
+        // MSGS:
+        
+        let alice_message = Zeroizing::new(String::from("Whats up"));
+
+        let result = alice.send_message(&alice_message);
+        println!("Alice result: {:?}", result);
+        assert!(result.is_ok());
+
+        let result = match result.unwrap() {
+            ContactOutput::Wire(w) => w,
+            _ => panic!("Expected Wire output"),
+        };
+
+
 
 
     }

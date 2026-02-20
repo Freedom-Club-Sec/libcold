@@ -294,6 +294,7 @@ pub fn generate_shared_secrets(public_key_bytes: &[u8], algorithm: oqs::kem::Alg
     let kem = oqs::kem::Kem::new(algorithm)
         .map_err(|_| Error::KemError)?;
 
+
     let pk_ref = kem
         .public_key_from_bytes(public_key_bytes)
         .ok_or(Error::InvalidKemPublicKey)?;

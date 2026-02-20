@@ -51,5 +51,8 @@ pub enum Error {
     InvalidDataType,
 
     OTPKeyTooShort,
-    InvalidOTPCiphertext
+    InvalidOTPCiphertext,
+
+    CorruptedOTPState,
+    MessageInvalidUtf8
 }
