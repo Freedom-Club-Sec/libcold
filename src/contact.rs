@@ -799,7 +799,6 @@ impl Contact {
             return Err(Error::InvalidState);
         }
 
-
         let mut messages = vec![];
             
         // We have no pads (Either None or Empty vec).
@@ -848,7 +847,6 @@ impl Contact {
 
     fn do_process_otp_batch(&mut self, msgs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
         // NOTE: Rust / floors. So if it errors, u know why. 
-
 
         if msgs_plaintext.len() != ( (consts::ML_KEM_1024_CT_SIZE + consts::CLASSIC_MCELIECE_8_CT_SIZE) * (consts::OTP_PAD_SIZE / 32)) + (64 * (consts::OTP_PAD_SIZE / 64)) + consts::ML_DSA_87_SIGN_SIZE {
             return Err(Error::InvalidMsgsPlaintextLength);
@@ -1187,9 +1185,9 @@ mod tests {
 
         // MSGS:
         
-        let alice_message = Zeroizing::new(String::from("Hello, World!"));
+        let alice_message_1 = Zeroizing::new(String::from("Hello, World!"));
 
-        let result = alice.send_message(&alice_message);
+        let result = alice.send_message(&alice_message_1);
         println!("Alice result: {:?}", result);
         assert!(result.is_ok());
 
@@ -1222,7 +1220,38 @@ mod tests {
             _ => panic!("Expected Message output"),
         };
 
-        assert_eq!(alice_message, result_2.message, "Decrypted message not equal to original message");
+        assert_eq!(alice_message_1, result_2.message, "Decrypted message not equal to original message");
+
+
+
+
+        let alice_message_2 = Zeroizing::new(String::from("Hi Bob!!"));
+
+        let result = alice.send_message(&alice_message_2);
+        println!("Alice result: {:?}", result);
+        assert!(result.is_ok());
+
+        let result = match result.unwrap() {
+            ContactOutput::Wire(w) => w,
+            _ => panic!("Expected Wire output"),
+        };
+
+  
+        // 1 because we should've at this point sent Bob enough pads
+        assert_eq!(result.len(), 1, "Expected exactly one wire message");
+
+
+        let result = bob.process(result[0].as_ref());
+        println!("Bob result: {:?}", result);
+        assert!(result.is_ok());
+
+        let result = match result.unwrap() {
+            ContactOutput::Message(m) => m,
+            _ => panic!("Expected Message output"),
+        };
+
+        assert_eq!(alice_message_2, result.message, "Decrypted message not equal to original message");
+
 
     }
 }
