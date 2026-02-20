@@ -1297,5 +1297,11 @@ mod tests {
         assert_eq!(alice_message_2, result.message, "Decrypted message not equal to original message");
 
 
+
+        // This should error
+        let r = alice.i_confirm_message_has_been_sent();
+        assert!(r.is_err(), "Confirmation over use did not cause an error");
+
+
     }
 }
