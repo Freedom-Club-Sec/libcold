@@ -54,5 +54,11 @@ pub enum Error {
     InvalidOTPCiphertext,
 
     CorruptedOTPState,
-    MessageInvalidUtf8
+    MessageInvalidUtf8,
+
+    MessagesLockedUntilConfirm,
+
+    MessageLockAlreadyDisabled
+
+
 }

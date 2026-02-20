@@ -24,6 +24,8 @@ pub struct Contact {
     #[zeroize(skip)]
     state: ContactState,
 
+    message_locked: bool,
+
     // stored key material
 
     our_signing_pub_key: Option<Zeroizing<Vec<u8>>>,
@@ -77,6 +79,9 @@ impl Clone for Contact {
     fn clone(&self) -> Self {
         Contact {
             state: self.state.clone(), 
+
+            message_locked: self.message_locked.clone(),
+
             our_signing_pub_key: self.our_signing_pub_key.clone(),
             our_signing_secret_key: self.our_signing_secret_key.clone(),
             contact_signing_pub_key: self.contact_signing_pub_key.clone(),
@@ -131,6 +136,9 @@ impl Contact {
     pub fn new() -> Result<Self, Error> {
         let mut contact = Contact {
             state: ContactState::Uninitialized,
+
+            message_locked: false,
+
             our_smp_tmp_pub_key: None,
             our_smp_tmp_secret_key: None,
             contact_smp_tmp_pub_key: None,
@@ -208,7 +216,8 @@ impl Contact {
         };
         
         if self.state != ContactState::Verified {
-            // If we are not verified, we must still be in SMP.
+            // If we are not verified, we must still be in SMP, therefore if we encounter any
+            // error, we send failure.
             if result.is_ok() {
                 return result;
             } else {
@@ -592,7 +601,6 @@ impl Contact {
         self.our_next_strand_key = Some(Zeroizing::new(our_next_strand_key));
         self.contact_next_strand_key = Some(Zeroizing::new(contact_next_strand_key));
 
-
         self.do_new_ephemeral_keys()
     }
 
@@ -808,11 +816,28 @@ impl Contact {
     }
 
 
+    pub fn i_confirm_message_has_been_sent(&mut self) ->  Result<(), Error> {
+        if self.message_locked == false {
+            return Err(Error::MessageLockAlreadyDisabled);
+        }
+
+        self.message_locked = false;
+        
+        Ok(())
+    }
+    
     pub fn send_message(&mut self, message: &Zeroizing<String>) ->  Result<ContactOutput, Error> {
         // Failsafe to protect retarded callers
         if self.state != ContactState::Verified {
             return Err(Error::InvalidState);
         }
+
+        if self.message_locked == true {
+            return Err(Error::MessagesLockedUntilConfirm);
+        }
+        // Ensures we cannot send messages until the caller confirms they have successfully sent
+        // the message
+        self.message_locked = true;
 
         let mut messages = vec![];
             
@@ -1011,7 +1036,6 @@ impl Contact {
         self.our_next_strand_key = Some(our_next_strand_key);
         self.our_next_strand_nonce = Some(our_next_strand_nonce);
 
-        // Ok(ContactOutput::Wire(WireMessage(Zeroizing::new(ciphertext_blob))))
         Ok(Zeroizing::new(ciphertext_blob))
 
     }
@@ -1216,6 +1240,10 @@ mod tests {
         assert_eq!(result.len(), 2, "Expected exactly 2 wire message");
 
 
+        let r = alice.i_confirm_message_has_been_sent();
+        assert!(r.is_ok());
+
+
         let result_1 = bob.process(result[0].as_ref());
         println!("Bob result 1: {:?}", result_1);
         assert!(result_1.is_ok());
@@ -1252,6 +1280,9 @@ mod tests {
   
         // 1 because we should've at this point sent Bob enough pads
         assert_eq!(result.len(), 1, "Expected exactly one wire message");
+
+        let r = alice.i_confirm_message_has_been_sent();
+        assert!(r.is_ok());
 
 
         let result = bob.process(result[0].as_ref());
