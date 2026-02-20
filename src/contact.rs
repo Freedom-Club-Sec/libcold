@@ -526,6 +526,14 @@ impl Contact {
 
         self.state = ContactState::Verified;
 
+
+        let (our_next_strand_key, _) = crypto::one_time_pad(&answer_secret[..32], self.our_next_strand_key.as_ref().unwrap())?;
+        let (contact_next_strand_key, _) = crypto::one_time_pad(&answer_secret[..32], self.contact_next_strand_key.as_ref().unwrap())?;
+
+        self.our_next_strand_key = Some(Zeroizing::new(our_next_strand_key));
+        self.contact_next_strand_key = Some(Zeroizing::new(contact_next_strand_key));
+
+
         Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
     }
 
@@ -577,6 +585,13 @@ impl Contact {
         }
 
         self.state = ContactState::Verified;
+
+        let (our_next_strand_key, _) = crypto::one_time_pad(&answer_secret[..32], self.our_next_strand_key.as_ref().unwrap())?;
+        let (contact_next_strand_key, _) = crypto::one_time_pad(&answer_secret[..32], self.contact_next_strand_key.as_ref().unwrap())?;
+
+        self.our_next_strand_key = Some(Zeroizing::new(our_next_strand_key));
+        self.contact_next_strand_key = Some(Zeroizing::new(contact_next_strand_key));
+
 
         self.do_new_ephemeral_keys()
     }
@@ -1221,8 +1236,6 @@ mod tests {
         };
 
         assert_eq!(alice_message_1, result_2.message, "Decrypted message not equal to original message");
-
-
 
 
         let alice_message_2 = Zeroizing::new(String::from("Hi Bob!!"));
