@@ -288,9 +288,9 @@ impl Contact {
 
         let our_next_strand_key = crypto::generate_secure_random_bytes_whiten(32)?;
 
-        let our_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::STRAND_NONCE_SIZE)?;
+        let our_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::CHACHA20POLY1305_NONCE_SIZE)?;
 
-        let contact_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::STRAND_NONCE_SIZE)?;
+        let contact_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::CHACHA20POLY1305_NONCE_SIZE)?;
 
         let our_smp_nonce = crypto::generate_secure_random_bytes_whiten(consts::SMP_NONCE_SIZE)?;
 
@@ -352,10 +352,10 @@ impl Contact {
         let our_strand_key = Zeroizing::new(shared_secrets[32..64].to_vec());
 
 
-        let smp_ciphertext = data.get(key_ciphertexts.len() + 1 + consts::CHACHA20POLY1305_NONCE_LEN ..)
+        let smp_ciphertext = data.get(key_ciphertexts.len() + 1 + consts::CHACHA20POLY1305_NONCE_SIZE ..)
             .ok_or(Error::InvalidDataLength)?;
 
-        let chacha_nonce = data.get(key_ciphertexts.len() + 1 .. key_ciphertexts.len() + 1 + consts::CHACHA20POLY1305_NONCE_LEN)
+        let chacha_nonce = data.get(key_ciphertexts.len() + 1 .. key_ciphertexts.len() + 1 + consts::CHACHA20POLY1305_NONCE_SIZE)
             .ok_or(Error::InvalidDataLength)?;
 
 
@@ -373,10 +373,10 @@ impl Contact {
         let contact_smp_nonce = smp_plaintext.get(consts::ML_DSA_87_PK_SIZE .. consts::ML_DSA_87_PK_SIZE + consts::SMP_NONCE_SIZE)
             .ok_or(Error::InvalidSmpPlaintextLength)?;
 
-        let contact_next_strand_nonce = smp_plaintext.get(consts::ML_DSA_87_PK_SIZE + consts::SMP_NONCE_SIZE .. consts::ML_DSA_87_PK_SIZE + consts::SMP_NONCE_SIZE + consts::CHACHA20POLY1305_NONCE_LEN)
+        let contact_next_strand_nonce = smp_plaintext.get(consts::ML_DSA_87_PK_SIZE + consts::SMP_NONCE_SIZE .. consts::ML_DSA_87_PK_SIZE + consts::SMP_NONCE_SIZE + consts::CHACHA20POLY1305_NONCE_SIZE)
             .ok_or(Error::InvalidSmpPlaintextLength)?;
 
-        let our_next_strand_nonce = smp_plaintext.get(consts::ML_DSA_87_PK_SIZE + consts::SMP_NONCE_SIZE + consts::CHACHA20POLY1305_NONCE_LEN ..)
+        let our_next_strand_nonce = smp_plaintext.get(consts::ML_DSA_87_PK_SIZE + consts::SMP_NONCE_SIZE + consts::CHACHA20POLY1305_NONCE_SIZE ..)
             .ok_or(Error::InvalidSmpPlaintextLength)?;
 
  
@@ -586,7 +586,7 @@ impl Contact {
         self.state = ContactState::Uninitialized;
 
         let our_next_strand_key = crypto::generate_secure_random_bytes_whiten(32)?;
-        let our_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::STRAND_NONCE_SIZE)?;
+        let our_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::CHACHA20POLY1305_NONCE_SIZE)?;
         
         let our_strand_key = self.our_next_strand_key
             .as_ref()
@@ -597,7 +597,7 @@ impl Contact {
             .unwrap_or(&our_next_strand_nonce);
 
  
-        let mut out = Zeroizing::new(Vec::with_capacity(1 + 32 + consts::STRAND_NONCE_SIZE + 7));
+        let mut out = Zeroizing::new(Vec::with_capacity(1 + 32 + consts::CHACHA20POLY1305_NONCE_SIZE + 7));
         out.extend_from_slice(&our_next_strand_key);
         out.extend_from_slice(&our_next_strand_nonce);
         out.push(consts::SMP_TYPE_INIT_SMP);
@@ -967,7 +967,7 @@ impl Contact {
             .ok_or(Error::InvalidDataLength)?;
 
         let next_nonce = plaintext
-            .get(32..32 + consts::CHACHA20POLY1305_NONCE_LEN)
+            .get(32..32 + consts::CHACHA20POLY1305_NONCE_SIZE)
             .ok_or(Error::InvalidDataLength)?;
 
         self.contact_next_strand_key = Some(Zeroizing::new(next_key.to_vec()));
@@ -975,7 +975,7 @@ impl Contact {
         self.contact_next_strand_nonce = Some(Zeroizing::new(next_nonce.to_vec()));
 
         let message = plaintext
-            .get(32 + consts::CHACHA20POLY1305_NONCE_LEN..)
+            .get(32 + consts::CHACHA20POLY1305_NONCE_SIZE..)
             .ok_or(Error::InvalidDataLength)?;
 
         Ok(Zeroizing::new(message.to_vec()))
@@ -985,13 +985,13 @@ impl Contact {
     fn prepare_payload(&mut self, payload: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {
         let our_next_strand_key = crypto::generate_secure_random_bytes_whiten(32)?;
 
-        let our_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::STRAND_NONCE_SIZE)?;
+        let our_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::CHACHA20POLY1305_NONCE_SIZE)?;
 
         let our_strand_key = self.our_next_strand_key.as_ref().unwrap();
         let our_strand_nonce = self.our_next_strand_nonce.as_ref().unwrap();
 
        
-        let mut prepared_payload = Zeroizing::new(Vec::with_capacity(32 + consts::STRAND_NONCE_SIZE + payload.len()));
+        let mut prepared_payload = Zeroizing::new(Vec::with_capacity(32 + consts::CHACHA20POLY1305_NONCE_SIZE + payload.len()));
         prepared_payload.extend_from_slice(&our_next_strand_key);
         prepared_payload.extend_from_slice(&our_next_strand_nonce);
         prepared_payload.extend_from_slice(payload);
@@ -1079,7 +1079,7 @@ mod tests {
 
         assert!(
             result[0].len() >= 
-            1 + (consts::ML_KEM_1024_CT_SIZE * 2) + 16 + (consts::CHACHA20POLY1305_NONCE_LEN * 3) + 32 + consts::SMP_NONCE_SIZE + consts::ML_DSA_87_PK_SIZE, 
+            1 + (consts::ML_KEM_1024_CT_SIZE * 2) + 16 + (consts::CHACHA20POLY1305_NONCE_SIZE * 3) + 32 + consts::SMP_NONCE_SIZE + consts::ML_DSA_87_PK_SIZE, 
             "SMP step 2 output length mismatch"
         );
         assert_eq!(result[0][0], consts::SMP_TYPE_INIT_SMP, "SMP type byte mismatch");
@@ -1190,7 +1190,7 @@ mod tests {
 
         // MSGS:
         
-        let alice_message = Zeroizing::new(String::from("Whats up"));
+        let alice_message = Zeroizing::new(String::from("Hello, World!"));
 
         let result = alice.send_message(&alice_message);
         println!("Alice result: {:?}", result);

@@ -39,7 +39,7 @@ pub fn encrypt_chacha20poly1305(key_bytes: &Zeroizing<Vec<u8>>, plaintext: &[u8]
     // Generate nonce if not provided
     let nonce: Nonce = match nonce_bytes {
         Some(bytes) => {
-            if bytes.len() != consts::CHACHA20POLY1305_NONCE_LEN {
+            if bytes.len() != consts::CHACHA20POLY1305_NONCE_SIZE {
                 return Err(Error::InvalidChaCha20NonceLength);
             }
 
@@ -47,9 +47,9 @@ pub fn encrypt_chacha20poly1305(key_bytes: &Zeroizing<Vec<u8>>, plaintext: &[u8]
         },
         None => {
             // generate random nonce
-            let random_bytes = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_LEN)?;
+            let random_bytes = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_SIZE)?;
             let hashed = hash_sha3_512(&random_bytes);
-            let nonce_bytes = &hashed[..consts::CHACHA20POLY1305_NONCE_LEN];
+            let nonce_bytes = &hashed[..consts::CHACHA20POLY1305_NONCE_SIZE];
             *Nonce::from_slice(nonce_bytes)
         }
     };
@@ -82,7 +82,7 @@ pub fn decrypt_chacha20poly1305(key_bytes: &Zeroizing<Vec<u8>>, nonce_bytes: &[u
         return Err(Error::InvalidChaCha20KeyLength);
     }
 
-    if nonce_bytes.len() != consts::CHACHA20POLY1305_NONCE_LEN {
+    if nonce_bytes.len() != consts::CHACHA20POLY1305_NONCE_SIZE {
         return Err(Error::InvalidChaCha20NonceLength);
     }
 
@@ -441,12 +441,12 @@ mod tests {
         let plaintext = b"Hello world!";
 
         // Too short
-        let short_nonce = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_LEN - 1).unwrap();
+        let short_nonce = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_SIZE - 1).unwrap();
         let err = encrypt_chacha20poly1305(&key, plaintext, Some(short_nonce.as_slice()), 0).unwrap_err();
         assert!(matches!(err, Error::InvalidChaCha20NonceLength));
 
         // Too long
-        let long_nonce = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_LEN +1).unwrap();
+        let long_nonce = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_SIZE + 1).unwrap();
         let err = encrypt_chacha20poly1305(&key, plaintext, Some(long_nonce.as_slice()), 0).unwrap_err();
         assert!(matches!(err, Error::InvalidChaCha20NonceLength));
     }
@@ -456,7 +456,7 @@ mod tests {
     #[test]
     fn test_encrypt_nonce_behaviour_no_padding() {
         let key = generate_secure_random_bytes(32).unwrap();
-        let our_nonce = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_LEN).unwrap();
+        let our_nonce = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_SIZE).unwrap();
         let plaintext = b"Hello world!";
         let (_, nonce_1) = encrypt_chacha20poly1305(&key, plaintext, Some(our_nonce.as_slice()), 0).unwrap();
 
@@ -472,7 +472,7 @@ mod tests {
     #[test]
     fn test_encrypt_nonce_behaviour_with_padding() {
         let key = generate_secure_random_bytes(32).unwrap();
-        let our_nonce = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_LEN).unwrap();
+        let our_nonce = generate_secure_random_bytes(consts::CHACHA20POLY1305_NONCE_SIZE).unwrap();
         let plaintext = b"Hello world!";
         let (_, nonce_1) = encrypt_chacha20poly1305(&key, plaintext, Some(our_nonce.as_slice()), 60).unwrap();
 
