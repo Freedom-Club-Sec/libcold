@@ -196,6 +196,7 @@ impl Contact {
 
     pub fn restore_backup(&mut self) {
         // TODO: Prevent restore if backup OTPs and current OTPs differ.
+
         if let Some(b) = self.backup.take() {
             // Overwrite self fields from backup
             *self = *b;
@@ -210,7 +211,6 @@ impl Contact {
             ContactState::Uninitialized => self.do_smp_step_2(data),
             ContactState::SMPInit       => self.do_smp_step_3(data),
             ContactState::SMPStep2      => self.do_smp_step_4_request_answer(data),
-
             ContactState::SMPStep3      => self.do_smp_step_5(data),
             ContactState::Verified      => self.process_verified(data)
         };
@@ -1194,7 +1194,7 @@ mod tests {
         println!("Alice result 1: {:?}", result_1);
         assert!(result_1.is_ok());
 
-        let result_1 = match result_1.unwrap() {
+        match result_1.unwrap() {
             ContactOutput::None => {},
             _ => panic!("Expected None output"),
         };
@@ -1248,7 +1248,7 @@ mod tests {
         println!("Bob result 1: {:?}", result_1);
         assert!(result_1.is_ok());
 
-        let result_1 = match result_1.unwrap() {
+        match result_1.unwrap() {
             ContactOutput::Wire(w) => w,
             _ => panic!("Expected Wire output"),
         };
