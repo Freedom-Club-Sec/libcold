@@ -35,6 +35,7 @@ pub enum Error {
     InvalidPfsPlaintextLength,
     InvalidPfsType,
 
+    InvalidMsgsPlaintextLength,
     InvalidDataLength,
 
     Argon2IdHashingError,

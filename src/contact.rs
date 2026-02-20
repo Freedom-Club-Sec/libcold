@@ -226,11 +226,13 @@ impl Contact {
             .ok_or(Error::InvalidDataPlaintextLength)?;
 
         if type_byte == &consts::PFS_TYPE_PFS_NEW {
-            let pfs_plaintext = data_plaintext.get(1..).ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+            let pfs_plaintext = data_plaintext.get(1..)
+                .ok_or(Error::InvalidPfsPlaintextLength)?;
             return self.do_pfs_new(pfs_plaintext);
         
         } else if type_byte == &consts::PFS_TYPE_PFS_ACK {
-            let pfs_plaintext = data_plaintext.get(1..).ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+            let pfs_plaintext = data_plaintext.get(1..)
+                .ok_or(Error::InvalidPfsPlaintextLength)?;
             return self.do_pfs_ack(pfs_plaintext);
         }
 
@@ -422,7 +424,8 @@ impl Contact {
         }
 
         // now shadow and skip the leading type byte
-        let smp_plaintext = smp_plaintext.get(1..).ok_or(Error::InvalidSmpPlaintextLength).unwrap();
+        let smp_plaintext = smp_plaintext.get(1..)
+            .ok_or(Error::InvalidSmpPlaintextLength)?;
 
 
         let contact_signing_pk = smp_plaintext.get(..consts::ML_DSA_87_PK_SIZE)
@@ -530,10 +533,10 @@ impl Contact {
 
         // now shadow and skip the leading type byte
         let smp_plaintext = smp_plaintext.get(1..)
-            .ok_or(Error::InvalidSmpPlaintextLength).unwrap();
+            .ok_or(Error::InvalidSmpPlaintextLength)?;
 
         let contact_proof = smp_plaintext.get(.. 64)
-            .ok_or(Error::InvalidSmpPlaintextLength).unwrap();
+            .ok_or(Error::InvalidSmpPlaintextLength)?;
   
         let smp_answer = self.smp_answer.as_ref().unwrap();
         let smp_answer = smp_answer.deref().as_bytes();
@@ -609,23 +612,23 @@ impl Contact {
 
 
         let signature = pfs_plaintext.get(.. consts::ML_DSA_87_SIGN_SIZE)
-            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+            .ok_or(Error::InvalidPfsPlaintextLength)?;
 
         let signature_data = pfs_plaintext.get(consts::ML_DSA_87_SIGN_SIZE ..)
-            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+            .ok_or(Error::InvalidPfsPlaintextLength)?;
 
         // Verify the signature of the public-keys and the hash-chain.
         crypto::verify_signature(oqs::sig::Algorithm::MlDsa87, contact_signing_pk, signature_data, signature)?;
 
         let contact_next_hash_chain = pfs_plaintext.get(consts::ML_DSA_87_SIGN_SIZE .. consts::ML_DSA_87_SIGN_SIZE + 64)
-            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+            .ok_or(Error::InvalidPfsPlaintextLength)?;
 
 
         let contact_ml_kem_pk = pfs_plaintext.get(64 + consts::ML_DSA_87_SIGN_SIZE .. 64 + consts::ML_DSA_87_SIGN_SIZE + consts::ML_KEM_1024_PK_SIZE)
-            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+            .ok_or(Error::InvalidPfsPlaintextLength)?;
 
         let contact_mceliece_pk = pfs_plaintext.get(64 + consts::ML_DSA_87_SIGN_SIZE + consts::ML_KEM_1024_PK_SIZE + consts::CLASSIC_MCELIECE_8_PK_SIZE ..)
-            .ok_or(Error::InvalidPfsPlaintextLength).unwrap();
+            .ok_or(Error::InvalidPfsPlaintextLength)?;
 
 
         if contact_hash_chain.is_some() {
@@ -649,7 +652,6 @@ impl Contact {
 
 
         if (!self.our_ml_kem_secret_key.is_some() || !self.our_mceliece_secret_key.is_some()) && (!self.our_staged_ml_kem_secret_key.is_some() || !self.our_staged_mceliece_secret_key.is_some()) {
-            println!("######################### Uhm, WE SENDING EPHEMERAL KEYS!!!!11");
             let ephemeral = self.do_new_ephemeral_keys()?;
 
             let mut messages = vec![WireMessage(final_payload)];
@@ -791,8 +793,6 @@ impl Contact {
         let contact_mceliece_pk = self.contact_mceliece_pub_key
             .as_ref().ok_or(Error::UninitializedContactKeys)?;
 
-
-
         let mut messages = vec![];
             
         // We have no pads (Either None or Empty vec).
@@ -808,7 +808,6 @@ impl Contact {
 
         // We do this to ensure if our pads are not enough for the padded message, we simply
         // generate new pads.
-        
         let (message_encrypted, new_pads) = match crypto::otp_encrypt_with_padding(message.as_bytes(), our_pads) {
             Ok((ct, np)) => (ct, np),
             Err(_) => {
@@ -837,7 +836,74 @@ impl Contact {
         messages.push(WireMessage(final_payload));
 
         Ok(ContactOutput::Wire(messages))
-        // Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
+    }
+
+
+    fn do_process_otp_batch(&mut self, msgs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
+        // NOTE: Rust / floors. So if it errors, u know why. 
+
+
+        if msgs_plaintext.len() != ( (consts::ML_KEM_1024_CT_SIZE + consts::CLASSIC_MCELIECE_8_CT_SIZE) * (consts::OTP_PAD_SIZE / 32)) + (64 * (consts::OTP_PAD_SIZE / 64)) + consts::ML_DSA_87_SIGN_SIZE {
+            return Err(Error::InvalidMsgsPlaintextLength);
+        }
+
+        let contact_signing_pk = self.contact_signing_pub_key
+            .as_ref().unwrap();
+
+
+        let our_ml_kem_sk = self.our_ml_kem_secret_key
+            .as_ref().ok_or(Error::UninitializedContactKeys)?;
+
+        let our_mceliece_sk = self.our_mceliece_secret_key
+            .as_ref().ok_or(Error::UninitializedContactKeys)?;
+
+
+
+        let batch_signature = msgs_plaintext
+            .get(.. consts::ML_DSA_87_SIGN_SIZE)
+            .ok_or(Error::InvalidMsgsPlaintextLength)?;
+
+        let batch_ciphertext = msgs_plaintext
+            .get(consts::ML_DSA_87_SIGN_SIZE .. consts::ML_DSA_87_SIGN_SIZE + ((consts::ML_KEM_1024_CT_SIZE + consts::CLASSIC_MCELIECE_8_CT_SIZE) * (consts::OTP_PAD_SIZE / 32)))
+            .ok_or(Error::InvalidMsgsPlaintextLength)?;
+
+        let chacha_shared_secrets = msgs_plaintext
+            .get(consts::ML_DSA_87_SIGN_SIZE + ((consts::ML_KEM_1024_CT_SIZE + consts::CLASSIC_MCELIECE_8_CT_SIZE) * (consts::OTP_PAD_SIZE / 32)) ..)
+            .ok_or(Error::InvalidMsgsPlaintextLength)?;
+
+
+        crypto::verify_signature(oqs::sig::Algorithm::MlDsa87, contact_signing_pk, batch_ciphertext, batch_signature)?;
+
+
+        let batch_ml_kem_ciphertext = batch_ciphertext
+            .get(..consts::ML_KEM_1024_CT_SIZE * (consts::OTP_PAD_SIZE / 32))
+            .ok_or(Error::InvalidMsgsPlaintextLength)?;
+
+        let batch_mceliece_ciphertext = batch_ciphertext
+            .get(consts::CLASSIC_MCELIECE_8_CT_SIZE * (consts::OTP_PAD_SIZE / 32) ..)
+            .ok_or(Error::InvalidMsgsPlaintextLength)?;
+
+
+        let ml_kem_secrets = crypto::decrypt_shared_secrets(batch_ml_kem_ciphertext, our_ml_kem_sk, oqs::kem::Algorithm::MlKem1024, consts::OTP_PAD_SIZE)?;
+        let mceliece_secrets = crypto::decrypt_shared_secrets(batch_mceliece_ciphertext, our_mceliece_sk, oqs::kem::Algorithm::ClassicMcEliece8192128, consts::OTP_PAD_SIZE)?;
+
+
+        let (contact_pads, _) = crypto::one_time_pad(&ml_kem_secrets, &mceliece_secrets)?;
+        let (contact_pads, _) = crypto::one_time_pad(contact_pads.as_slice(), chacha_shared_secrets)?;
+
+
+        let contact_next_strand_key = contact_pads
+            .get(..32)
+            .ok_or(Error::InvalidMsgsPlaintextLength)?;
+
+        let contact_pads = contact_pads
+            .get(32..)
+            .ok_or(Error::InvalidMsgsPlaintextLength)?;
+
+
+        let final_payload = self.do_new_ephemeral_keys()?;
+
+        Ok(final_payload)
 
     }
 
