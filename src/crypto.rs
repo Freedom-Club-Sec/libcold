@@ -18,7 +18,6 @@ use argon2::{
 
 use zeroize::Zeroizing;
 use subtle::ConstantTimeEq;
-use std::collections::HashSet;
 
 use crate::consts;
 use crate::Error;
@@ -385,14 +384,10 @@ pub fn compare_secrets(a: &[u8], b: &[u8]) -> bool {
 }
 
 
-
-
-
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
 
     #[test]
@@ -472,6 +467,18 @@ mod tests {
 
         let pt = decrypt_chacha20poly1305(&key, &nonce, &ct).unwrap();
         assert_eq!(pt.as_slice(), plaintext, "Decrypted ciphertext is not equal to plaintext");
+
+        for i in 0..ct.len() {
+            let mut tampered = ct.clone();
+            tampered[i] ^= 0xFF; 
+
+            // Decryption should fail
+            assert!(
+                decrypt_chacha20poly1305(&key, &nonce, &tampered).is_err(),
+                "Tampered ciphertext at byte {} decrypted successfully — integrity check failed",
+                i
+            );
+        }
     }
 
     #[test]
@@ -487,6 +494,19 @@ mod tests {
 
         let pt = decrypt_chacha20poly1305(&key, &nonce, &ct).unwrap();
         assert_eq!(pt.as_slice(), plaintext, "Decrypted ciphertext is not equal to plaintext");
+
+
+        for i in 0..ct.len() {
+            let mut tampered = ct.clone();
+            tampered[i] ^= 0xFF; 
+
+            // Decryption should fail
+            assert!(
+                decrypt_chacha20poly1305(&key, &nonce, &tampered).is_err(),
+                "Tampered ciphertext at byte {} decrypted successfully — integrity check failed",
+                i
+            );
+        }
     }
 
 
