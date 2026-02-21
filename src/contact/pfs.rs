@@ -71,7 +71,7 @@ impl Contact {
         Ok(ContactOutput::Wire(vec![WireMessage(final_payload)]))
     }
 
-    pub(super) fn do_pfs_ack(&mut self, pfs_plaintext: &[u8]) ->  Result<ContactOutput, Error> {
+    pub(super) fn do_pfs_ack(&mut self, _: &[u8]) ->  Result<ContactOutput, Error> {
         self.our_ml_kem_secret_key = self.our_staged_ml_kem_secret_key.take();
         self.our_ml_kem_pub_key = self.our_staged_ml_kem_pub_key.take();
 

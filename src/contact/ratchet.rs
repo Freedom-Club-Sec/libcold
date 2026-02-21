@@ -1,7 +1,6 @@
 use super::*;
 
 
-
 impl Contact {
     pub(super) fn decrypt_incoming_data(&mut self, blob: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {
         let contact_strand_key = self.contact_next_strand_key.as_ref().unwrap();
