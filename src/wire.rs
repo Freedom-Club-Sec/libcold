@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use zeroize::Zeroizing;
 
-use crate::smp;
+use crate::contact;
 use crate::error::Error;
 
 
@@ -33,7 +33,7 @@ pub struct UserAnswer(pub Zeroizing<String>);
 
 impl UserAnswer {
     pub fn new(s: String) -> Result<Self, Error> {
-        Ok(Self(smp::normalize_smp_answer(Zeroizing::new(s))?))
+        Ok(Self(contact::normalize_smp_answer(Zeroizing::new(s))?))
     }
 }
 
