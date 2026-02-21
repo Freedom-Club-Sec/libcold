@@ -1,7 +1,5 @@
 # libcold
-Crate that implements the strandlock protocol in pure Rust., which is used in Coldwire messenger
+Crate that implements the strandlock encryption protocol in pure Rust.
 
-
-# Important
-This library is still work-in-progress, it only has SMP implemented.
+This protocol is used within Coldwire messenger
 
