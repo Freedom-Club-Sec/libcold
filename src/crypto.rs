@@ -1,5 +1,3 @@
-use zeroize::Zeroizing;
-use subtle::ConstantTimeEq;
 use hmac::{
     Hmac, Mac
 };
@@ -17,6 +15,11 @@ use chacha20poly1305::{
 use argon2::{
     Argon2, Params
 };
+
+use zeroize::Zeroizing;
+use subtle::ConstantTimeEq;
+use std::collections::HashSet;
+
 use crate::consts;
 use crate::Error;
 
@@ -382,27 +385,79 @@ pub fn compare_secrets(a: &[u8], b: &[u8]) -> bool {
 }
 
 
+
+
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
 
     #[test]
-    fn test_secure_random_bytes() {
+    fn test_secure_random_bytes_duplicates() {
         let len = 32;
+        let samples = 100_000;
+        let mut seen = HashSet::with_capacity(samples);
 
-        let buf1 = generate_secure_random_bytes(len).expect("Failed to generate random bytes");
-        let buf2 = generate_secure_random_bytes(len).expect("Failed to generate random bytes");
+        for _ in 0..samples {
+            let buf = generate_secure_random_bytes(len).expect("Failed to generate random bytes");
+            
+            assert_eq!(buf.len(), len, "Generated buffer has incorrect length");
 
-        assert_eq!(buf1.len(), len, "Generated buffer has incorrect length");
-        assert_eq!(buf2.len(), len, "Generated buffer has incorrect length");
-
-        assert_ne!(buf1.as_slice(), buf2.as_slice(), "Two generated random buffers are identical; unlikely");
-
-        assert!(buf1.iter().any(|&b| b != 0), "Random buffer is all zeros, unlikely");
-        assert!(buf2.iter().any(|&b| b != 0), "Random buffer is all zeros, unlikely");
-
+            assert!(buf.iter().any(|&b| b != 0), "Random buffer is all zeros, unlikely");
+            assert!(buf.iter().any(|&b| b != 255), "Random buffer is all 255s, unlikely");
+            
+            assert!(seen.insert(buf.to_vec()), "Duplicate random buffer detected");
+        }
     }
+
+
+    #[test]
+    fn test_secure_random_bytes_whitened() {
+        let len = 32;
+        let samples = 100_000;
+        let mut seen = HashSet::with_capacity(samples);
+
+        for _ in 0..samples {
+            let buf = generate_secure_random_bytes_whiten(len).expect("Failed to generate random bytes");
+            
+            assert_eq!(buf.len(), len, "Generated buffer has incorrect length");
+
+            assert!(buf.iter().any(|&b| b != 0), "Random buffer is all zeros, unlikely");
+            assert!(buf.iter().any(|&b| b != 255), "Random buffer is all 255s, unlikely");
+            
+            assert!(seen.insert(buf.to_vec()), "Duplicate random buffer detected");
+        }
+    }
+
+
+    #[test]
+    fn test_secure_random_bytes_mixed() {
+        let len = 32;
+        let samples = 50000;
+        let mut seen = HashSet::with_capacity(samples);
+
+        for _ in 0..samples {
+            let buf1 = generate_secure_random_bytes(len).expect("Failed to generate random bytes");
+            let buf2 = generate_secure_random_bytes_whiten(len).expect("Failed to generate random bytes");
+            
+            assert_eq!(buf1.len(), len, "Generated buffer has incorrect length");
+            assert_eq!(buf2.len(), len, "Generated buffer has incorrect length");
+
+            assert!(buf1.iter().any(|&b| b != 0), "Random buffer is all zeros, unlikely");
+            assert!(buf1.iter().any(|&b| b != 255), "Random buffer is all 255s, unlikely");
+
+            assert!(buf2.iter().any(|&b| b != 0), "Random buffer is all zeros, unlikely");
+            assert!(buf2.iter().any(|&b| b != 255), "Random buffer is all 255s, unlikely");
+            
+            assert!(seen.insert(buf1.to_vec()), "Duplicate random buffer detected");
+            assert!(seen.insert(buf2.to_vec()), "Duplicate random buffer detected");
+        }
+    }
+
+
 
     #[test]
     fn test_encrypt_decrypt_roundtrip_no_padding() {
