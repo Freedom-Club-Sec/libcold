@@ -480,16 +480,17 @@ mod tests {
 
         let data = String::from("Hello, World!");
         let sig = generate_ml_dsa_87_signature(&sk, &data.as_bytes()).expect("Failed to generate signature");
-
         
-        assert!(verify_ml_dsa_87_signature(&pk, &data.as_bytes(), sig.as_slice()).is_ok(), "Signature verification valid despite it being valid");
-
+        assert!(verify_ml_dsa_87_signature(&pk, &data.as_bytes(), sig.as_slice()).is_ok(), "Signature verification failed despite data being valid");
 
         let tampered_data = String::from("Hello! World!");
-        assert!(verify_ml_dsa_87_signature(&pk, &tampered_data.as_bytes(), sig.as_slice()).is_err(), "Signature verification valid despite it being tampered");
+        assert!(verify_ml_dsa_87_signature(&pk, &tampered_data.as_bytes(), sig.as_slice()).is_err(), "Signature verification passed despite data being tampered");
 
+
+        let (pk2, sk2) = generate_ml_dsa_87_keypair().expect("Failed to generate ML-DSA-87 keypair");
+
+        assert!(verify_ml_dsa_87_signature(&pk2, &data.as_bytes(), sig.as_slice()).is_err(), "Signature verification valid despite public-key being different");
     }
-
 
 
 

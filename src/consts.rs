@@ -1,4 +1,5 @@
 pub const ML_DSA_87_PK_SIZE: usize = 2592;
+pub const ML_DSA_87_SK_SIZE: usize = 4896;
 pub const ML_DSA_87_SIGN_SIZE: usize = 4627;
 
 pub const ML_KEM_1024_PK_SIZE: usize = 1568;
