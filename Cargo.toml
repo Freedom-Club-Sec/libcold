@@ -3,8 +3,9 @@ name = "libcold"
 version = "0.0.1"
 edition = "2024"
 license = "MIT"
-description = "High-assurance crypto protocol library for Coldwire (Strandlock implementation)"
+description = "High-assurance crypto protocol library for Coldwire messenger (Strandlock implementation)"
 authors = ["Freedom Club Sec"]
+repository = "https://github.com/Freedom-Club-Sec/libcold/"
 
 [dependencies]
 zeroize = { version = "1.8", features = ["derive"] }
