@@ -21,7 +21,7 @@ impl Contact {
             .ok_or(Error::InvalidPfsPlaintextLength)?;
 
         // Verify the signature of the public-keys and the hash-chain.
-        crypto::verify_signature(oqs::sig::Algorithm::MlDsa87, contact_signing_pk, signature_data, signature)?;
+        crypto::verify_ml_dsa_87_signature(contact_signing_pk, signature_data, signature)?;
 
         let contact_next_hash_chain = pfs_plaintext.get(consts::ML_DSA_87_SIGN_SIZE .. consts::ML_DSA_87_SIGN_SIZE + 64)
             .ok_or(Error::InvalidPfsPlaintextLength)?;
@@ -104,7 +104,7 @@ impl Contact {
         pks_hash_chain.extend_from_slice(ml_kem_pk.as_slice());
         pks_hash_chain.extend_from_slice(mceliece_pk.as_slice());
 
-        let signature_pks_hash_chain = crypto::generate_signature(oqs::sig::Algorithm::MlDsa87, ml_dsa_sk, &pks_hash_chain)?;
+        let signature_pks_hash_chain = crypto::generate_ml_dsa_87_signature(ml_dsa_sk, &pks_hash_chain)?;
 
         let mut payload = Zeroizing::new(Vec::with_capacity(
                 1 + 

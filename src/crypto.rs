@@ -216,16 +216,16 @@ pub fn hash_sha3_512(data: &Zeroizing<Vec<u8>>) -> Zeroizing<Vec<u8>> {
 }
 
 
-pub fn generate_signing_keypair(alg: oqs::sig::Algorithm) -> oqs::Result<(Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>)> {    
-    let sigalg = oqs::sig::Sig::new(alg)?;
+pub fn generate_ml_dsa_87_keypair() -> oqs::Result<(Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>)> {    
+    let sigalg = oqs::sig::Sig::new(oqs::sig::Algorithm::MlDsa87)?;
     let (pk, sk) = sigalg.keypair()?;
     
     Ok((Zeroizing::new(pk.as_ref().to_vec()), Zeroizing::new(sk.as_ref().to_vec())))
 }
 
 
-pub fn generate_signature(alg: oqs::sig::Algorithm, secret_key_bytes: &[u8], data: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {    
-    let sigalg = oqs::sig::Sig::new(alg)
+pub fn generate_ml_dsa_87_signature(secret_key_bytes: &[u8], data: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {    
+    let sigalg = oqs::sig::Sig::new(oqs::sig::Algorithm::MlDsa87)
         .map_err(|_| Error::SigError)?;
 
     let sk = sigalg
@@ -238,8 +238,8 @@ pub fn generate_signature(alg: oqs::sig::Algorithm, secret_key_bytes: &[u8], dat
     Ok(Zeroizing::new(signature.into_vec()))
 }
 
-pub fn verify_signature(alg: oqs::sig::Algorithm, public_key_bytes: &[u8], data: &[u8], signature_bytes: &[u8]) -> Result<(), Error> {    
-    let sigalg = oqs::sig::Sig::new(alg)
+pub fn verify_ml_dsa_87_signature(public_key_bytes: &[u8], data: &[u8], signature_bytes: &[u8]) -> Result<(), Error> {    
+    let sigalg = oqs::sig::Sig::new(oqs::sig::Algorithm::MlDsa87)
         .map_err(|_| Error::SigError)?;
 
     let sig_pk = sigalg
@@ -451,6 +451,46 @@ mod tests {
             assert!(seen.insert(buf2.to_vec()), "Duplicate random buffer detected");
         }
     }
+
+    #[test]
+    fn test_ml_dsa_87_duplicates() {
+        let samples = 500;
+        let mut seen = HashSet::with_capacity(samples);
+
+        for _ in 0..samples {
+            let (pk, sk) = generate_ml_dsa_87_keypair().expect("Failed to generate ML-DSA-87 keypair");
+            
+            assert_eq!(pk.len(), consts::ML_DSA_87_PK_SIZE, "Generated public-key does not equal to NIST-specified sizes");
+
+            assert!(pk.iter().any(|&b| b != 0), "Public key is all zeros, unlikely");
+            assert!(pk.iter().any(|&b| b != 255), "Public key is all 255s, unlikely");
+            
+            assert!(sk.iter().any(|&b| b != 0), "Secret key is all zeros, unlikely");
+            assert!(sk.iter().any(|&b| b != 255), "Secret key is all 255s, unlikely");
+
+
+            assert!(seen.insert(pk.to_vec()), "Duplicate public-key detected");
+            assert!(seen.insert(sk.to_vec()), "Duplicate public-key detected");
+        }
+    }
+
+    #[test]
+    fn test_ml_dsa_87_signatures_verification() {
+        let (pk, sk) = generate_ml_dsa_87_keypair().expect("Failed to generate ML-DSA-87 keypair");
+
+        let data = String::from("Hello, World!");
+        let sig = generate_ml_dsa_87_signature(&sk, &data.as_bytes()).expect("Failed to generate signature");
+
+        
+        assert!(verify_ml_dsa_87_signature(&pk, &data.as_bytes(), sig.as_slice()).is_ok(), "Signature verification valid despite it being valid");
+
+
+        let tampered_data = String::from("Hello! World!");
+        assert!(verify_ml_dsa_87_signature(&pk, &tampered_data.as_bytes(), sig.as_slice()).is_err(), "Signature verification valid despite it being tampered");
+
+    }
+
+
 
 
 

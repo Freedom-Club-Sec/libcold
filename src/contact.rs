@@ -199,7 +199,7 @@ impl Contact {
   
     
     fn init_lt_sign_keypair(&mut self) -> Result<(), Error> {
-        let (pk, sk) = crypto::generate_signing_keypair(oqs::sig::Algorithm::MlDsa87)
+        let (pk, sk) = crypto::generate_ml_dsa_87_keypair()
             .map_err(|_| Error::CryptoFail)?;
 
 

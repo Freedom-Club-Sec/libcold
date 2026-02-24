@@ -26,7 +26,7 @@ impl Contact {
         otp_batch_plain.extend_from_slice(ml_kem_ciphertexts.as_slice());
         otp_batch_plain.extend_from_slice(mceliece_ciphertexts.as_slice());
 
-        let otp_batch_signature = crypto::generate_signature(oqs::sig::Algorithm::MlDsa87, ml_dsa_sk, &otp_batch_plain)?;
+        let otp_batch_signature = crypto::generate_ml_dsa_87_signature(ml_dsa_sk, &otp_batch_plain)?;
 
         otp_batch_plain.extend_from_slice(chacha_shared_secrets.as_slice());
 
@@ -155,7 +155,7 @@ impl Contact {
             .ok_or(Error::InvalidMsgsPlaintextLength)?;
 
 
-        crypto::verify_signature(oqs::sig::Algorithm::MlDsa87, contact_signing_pk, batch_ciphertext, batch_signature)?;
+        crypto::verify_ml_dsa_87_signature(contact_signing_pk, batch_ciphertext, batch_signature)?;
 
 
         let batch_ml_kem_ciphertext = batch_ciphertext
