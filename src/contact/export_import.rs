@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 const MAX_FIELD_LEN: usize = 2 * 1024 * 1024; // 2 MiB max per field 
 
 // The Magic byte
-const MAGIC: &[u8] = b"COLDWIRE\0";
+const MAGIC: &[u8] = b"COLDWIREMESSENGER\0";
 
 
 impl Contact {
