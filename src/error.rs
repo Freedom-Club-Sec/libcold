@@ -58,7 +58,15 @@ pub enum Error {
 
     MessagesLockedUntilConfirm,
 
-    MessageLockAlreadyDisabled
+    MessageLockAlreadyDisabled,
+
+    FieldTooLarge,
+    InvalidMagic,
+    InvalidUtf8,
+
+    InvalidImportBlob,
+    IncompatibleBlobVersion
+
 
 
 }

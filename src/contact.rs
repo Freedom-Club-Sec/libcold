@@ -6,6 +6,7 @@ use crate::crypto;
 use crate::wire::{ContactOutput, WireMessage, UserPrompt, UserAnswer, NewMessage};
 use crate::error::Error;
 
+mod export_import;
 mod clone;
 mod smp;
 mod pfs;
@@ -228,9 +229,23 @@ impl Contact {
 mod tests {
     use super::*;
 
+
+    #[test]
+    fn test_export_import() {
+        let mut alice = Contact::new().expect("Failed to create new contact instance");
+        let mut bob = Contact::new().expect("Failed to create new contact instance");
+
+
+        let bob_plain = alice.export_plain().unwrap();
+        let alice_plain = bob.export_plain().unwrap();
+
+        assert_ne!(bob_plain, alice_plain, "Bob exported plaintext is equal to Alice exported plaintext.");
+
+
+    }
+
     #[test]
     fn test_full_two_sessions() {
-
         // Alice initiates a new SMP session
         let alice_question = String::from("This is a question");
         let alice_answer = String::from("This is an answer");
@@ -460,6 +475,44 @@ mod tests {
         let r = alice.i_confirm_message_has_been_sent();
         assert!(r.is_err(), "Confirmation over use did not cause an error");
 
+
+
+        let bob_plain = alice.export_plain().unwrap();
+        let alice_plain = bob.export_plain().unwrap();
+
+        assert_ne!(bob_plain, alice_plain, "Bob exported plaintext is the same as Alice exported plaintext.");
+
+        let bob_plain_2 = alice.export_plain().unwrap();
+        let alice_plain_2 = bob.export_plain().unwrap();
+
+
+        // There should not be any changes on both ends since we have not altered the struct.
+        assert_eq!(bob_plain_2, bob_plain, "Bob re-exported plaintext is not equal to Bob exported plaintext.");
+        
+        assert_eq!(alice_plain_2, alice_plain, "Alice re-exported plaintext is not equal to Alice exported plaintext.");
+
+        assert_ne!(bob_plain_2, alice_plain_2, "Bob re-exported plaintext is the same as Alice re-exported plaintext.");
+
+
+
+        let alice = Contact::import_plain(bob_plain.as_slice()).unwrap();
+        let bob = Contact::import_plain(alice_plain.as_slice()).unwrap();
+
+        let bob_plain = alice.export_plain().unwrap();
+        let alice_plain = bob.export_plain().unwrap();
+
+        assert_ne!(bob_plain, alice_plain, "Bob exported plaintext is the same as Alice exported plaintext.");
+
+        let bob_plain_2 = alice.export_plain().unwrap();
+        let alice_plain_2 = bob.export_plain().unwrap();
+
+
+        // There should not be any changes on both ends since we have not altered the struct.
+        assert_eq!(bob_plain_2, bob_plain, "Bob re-exported plaintext is not equal to Bob exported plaintext.");
+        
+        assert_eq!(alice_plain_2, alice_plain, "Alice re-exported plaintext is not equal to Alice exported plaintext.");
+
+        assert_ne!(bob_plain_2, alice_plain_2, "Bob re-exported plaintext is the same as Alice re-exported plaintext.");
 
     }
 }
