@@ -2,4 +2,5 @@ target/
 tests/
 *.sw*
 src/*.sw.*
+Cargo.lock
 
