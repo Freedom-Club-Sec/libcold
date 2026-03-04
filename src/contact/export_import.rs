@@ -13,7 +13,7 @@ impl Contact {
     /// Export the contact into a versioned, explicit plaintext blob.
     /// Caller MUST encrypt this blob before storing/transmitting it.
     /// Returns Zeroizing<Vec<u8>> so the plaintext will be zeroed on drop.
-    pub(super) fn export_plain(&self) -> Result<Zeroizing<Vec<u8>>, Error> {
+    pub fn export_plain(&self) -> Result<Zeroizing<Vec<u8>>, Error> {
         let mut out = Vec::with_capacity(1024);
 
         out.extend_from_slice(MAGIC);
@@ -79,7 +79,7 @@ impl Contact {
 
     /// Import a plaintext blob created by export_plain.
     /// The blob MUST have been authenticated and decrypted by the caller before calling this.
-    pub(super) fn import_plain(blob: &[u8]) -> Result<Self, Error> {
+    pub fn import_plain(blob: &[u8]) -> Result<Self, Error> {
         let mut cur = Cursor::new(blob);
 
         let mut magic_buf = [0u8; MAGIC.len()];
