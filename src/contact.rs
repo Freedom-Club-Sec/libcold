@@ -26,7 +26,7 @@ enum ContactState {
 }
 
 // Public contact struct (one per contact)
-#[derive(Zeroize)]
+#[derive(Zeroize, Debug)]
 #[zeroize(drop)]
 pub struct Contact {
     #[zeroize(skip)]
