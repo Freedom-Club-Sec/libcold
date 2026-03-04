@@ -79,7 +79,7 @@ pub struct Contact {
     contact_hash_chain: Option<Zeroizing<Vec<u8>>>,
 
 
-    additional_data: Option<Zeroizing<Vec<u8>>>,
+    pub additional_data: Option<Zeroizing<Vec<u8>>>,
 
     #[zeroize(skip)]
     backup: Option<Box<Contact>>
