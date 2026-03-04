@@ -70,7 +70,7 @@ pub struct Contact {
     contact_smp_proof: Option<Zeroizing<Vec<u8>>>,
 
     smp_answer: Option<Zeroizing<String>>,
-    smp_question: Option<String>,
+    smp_question: Option<Zeroizing<String>>,
 
     our_pads: Option<Zeroizing<Vec<u8>>>,
     contact_pads: Option<Zeroizing<Vec<u8>>>,
@@ -258,8 +258,8 @@ mod tests {
         let mut alice = Contact::new().expect("Failed to create new contact instance");
 
         let result = alice.init_smp(
-            alice_question.clone(),
-            alice_answer.clone()
+            Zeroizing::new(alice_question.clone()),
+            Zeroizing::new(alice_answer.clone())
         );
 
         println!("Alice result: {:?}", result);

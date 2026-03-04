@@ -65,7 +65,7 @@ impl Contact {
         write_opt_bytes(&mut out, &self.contact_smp_proof)?;
 
         write_opt_zeroize_string(&mut out, &self.smp_answer)?;
-        write_opt_string(&mut out, &self.smp_question)?;
+        write_opt_zeroize_string(&mut out, &self.smp_question)?;
 
         write_opt_bytes(&mut out, &self.our_pads)?;
         write_opt_bytes(&mut out, &self.contact_pads)?;
@@ -143,7 +143,7 @@ impl Contact {
         let contact_smp_proof = read_opt_bytes(&mut cur, MAX_FIELD_LEN)?;
 
         let smp_answer = read_opt_zeroize_string(&mut cur, MAX_FIELD_LEN)?;
-        let smp_question = read_opt_string(&mut cur, MAX_FIELD_LEN)?;
+        let smp_question = read_opt_zeroize_string(&mut cur, MAX_FIELD_LEN)?;
 
         let our_pads = read_opt_bytes(&mut cur, MAX_FIELD_LEN)?;
         let contact_pads = read_opt_bytes(&mut cur, MAX_FIELD_LEN)?;

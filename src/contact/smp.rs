@@ -59,9 +59,9 @@ pub(crate) fn normalize_smp_answer(s: Zeroizing<String>) -> Result<Zeroizing<Str
 
 
 impl Contact {
-    pub fn init_smp(&mut self, question: String, answer: String) -> Result<ContactOutput, Error> {
+    pub fn init_smp(&mut self, question: Zeroizing<String>, answer: Zeroizing<String>) -> Result<ContactOutput, Error> {
         // Normalize and store SMP answer
-        let normalized = normalize_smp_answer(Zeroizing::new(answer))?;
+        let normalized = normalize_smp_answer(answer)?;
         self.smp_answer = Some(normalized);
         self.smp_question = Some(question);
 
@@ -275,7 +275,7 @@ impl Contact {
             .map_err(|_| Error::SmpQuestionInvalidUtf8)?
             .to_owned();
 
-        self.smp_question = Some(question.clone());
+        self.smp_question = Some(Zeroizing::new(question.clone()));
 
         Ok(ContactOutput::Prompt(UserPrompt {
             question
