@@ -72,6 +72,8 @@ impl Contact {
 
         write_opt_bytes(&mut out, &self.our_hash_chain)?;
         write_opt_bytes(&mut out, &self.contact_hash_chain)?;
+        
+        write_opt_bytes(&mut out, &self.additional_data)?;
 
         // Note: backup is intentionally skipped (#[zeroize(skip)]).
         Ok(Zeroizing::new(out))
@@ -148,6 +150,8 @@ impl Contact {
 
         let our_hash_chain = read_opt_bytes(&mut cur, MAX_FIELD_LEN)?;
         let contact_hash_chain = read_opt_bytes(&mut cur, MAX_FIELD_LEN)?;
+        
+        let additional_data = read_opt_bytes(&mut cur, MAX_FIELD_LEN)?;
 
         if cur.position() != blob.len() as u64 {
             return Err(Error::InvalidDataPlaintextLength);
@@ -156,49 +160,51 @@ impl Contact {
 
         // Construct Contact - match the field ordering in the struct initializer
         let contact = Contact {
-            state,
-            message_locked,
+            state: state,
+            message_locked: message_locked,
 
-            our_signing_pub_key,
-            our_signing_secret_key,
-            contact_signing_pub_key,
+            our_signing_pub_key: our_signing_pub_key,
+            our_signing_secret_key: our_signing_secret_key,
+            contact_signing_pub_key: contact_signing_pub_key,
 
-            our_ml_kem_pub_key,
-            our_ml_kem_secret_key,
-            contact_ml_kem_pub_key,
+            our_ml_kem_pub_key: our_ml_kem_pub_key,
+            our_ml_kem_secret_key: our_ml_kem_secret_key,
+            contact_ml_kem_pub_key: contact_ml_kem_pub_key,
 
-            our_mceliece_pub_key,
-            our_mceliece_secret_key,
-            contact_mceliece_pub_key,
+            our_mceliece_pub_key: our_mceliece_pub_key,
+            our_mceliece_secret_key: our_mceliece_secret_key,
+            contact_mceliece_pub_key: contact_mceliece_pub_key,
 
-            our_staged_ml_kem_pub_key,
-            our_staged_ml_kem_secret_key,
+            our_staged_ml_kem_pub_key: our_staged_ml_kem_pub_key,
+            our_staged_ml_kem_secret_key: our_staged_ml_kem_secret_key,
 
-            our_staged_mceliece_pub_key,
-            our_staged_mceliece_secret_key,
+            our_staged_mceliece_pub_key: our_staged_mceliece_pub_key,
+            our_staged_mceliece_secret_key: our_staged_mceliece_secret_key,
 
-            our_smp_tmp_pub_key,
-            our_smp_tmp_secret_key,
-            contact_smp_tmp_pub_key,
+            our_smp_tmp_pub_key: our_smp_tmp_pub_key,
+            our_smp_tmp_secret_key: our_smp_tmp_secret_key,
+            contact_smp_tmp_pub_key: contact_smp_tmp_pub_key,
 
-            our_next_strand_key,
-            our_next_strand_nonce,
+            our_next_strand_key: our_next_strand_key,
+            our_next_strand_nonce: our_next_strand_nonce,
 
-            contact_next_strand_key,
-            contact_next_strand_nonce,
+            contact_next_strand_key: contact_next_strand_key,
+            contact_next_strand_nonce: contact_next_strand_nonce,
 
-            our_smp_nonce,
-            contact_smp_nonce,
-            contact_smp_proof,
+            our_smp_nonce: our_smp_nonce,
+            contact_smp_nonce: contact_smp_nonce,
+            contact_smp_proof: contact_smp_proof,
 
-            smp_answer,
-            smp_question,
+            smp_answer: smp_answer,
+            smp_question: smp_question,
 
-            our_pads,
-            contact_pads,
+            our_pads: our_pads,
+            contact_pads: contact_pads,
 
-            our_hash_chain,
-            contact_hash_chain,
+            our_hash_chain: our_hash_chain,
+            contact_hash_chain: contact_hash_chain,
+
+            additional_data: additional_data,
 
             backup: None,
         };

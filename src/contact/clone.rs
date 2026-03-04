@@ -51,6 +51,8 @@ impl Clone for Contact {
             our_hash_chain: self.our_hash_chain.clone(),
             contact_hash_chain: self.contact_hash_chain.clone(),
 
+            additional_data: self.additional_data.clone(),
+
             backup: None, // Always reset backup in clones
         }
     }

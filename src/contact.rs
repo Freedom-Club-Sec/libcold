@@ -78,6 +78,9 @@ pub struct Contact {
     our_hash_chain: Option<Zeroizing<Vec<u8>>>,
     contact_hash_chain: Option<Zeroizing<Vec<u8>>>,
 
+
+    additional_data: Option<Zeroizing<Vec<u8>>>,
+
     #[zeroize(skip)]
     backup: Option<Box<Contact>>
 }
@@ -132,6 +135,8 @@ impl Contact {
 
             our_hash_chain: None, 
             contact_hash_chain: None,
+            
+            additional_data: None,
 
             backup: None,
         };
