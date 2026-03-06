@@ -17,7 +17,7 @@ pub(crate) use smp::normalize_smp_answer;
 
 // Contact states for one contact
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum ContactState {
+pub enum ContactState {
     Uninitialized,
     SMPInit,
     SMPStep2,
@@ -30,7 +30,7 @@ enum ContactState {
 #[zeroize(drop)]
 pub struct Contact {
     #[zeroize(skip)]
-    state: ContactState,
+    pub state: ContactState,
 
     message_locked: bool,
 
