@@ -6,6 +6,6 @@ mod wire;
 
 
 pub use error::Error;
-pub use contact::Contact;
+pub use contact::{Contact, ContactState};
 pub use wire::{UserPrompt, UserAnswer, WireMessage, ContactOutput};
 

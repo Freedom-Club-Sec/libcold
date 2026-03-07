@@ -32,7 +32,9 @@ pub const ARGON2ID_SALT_SIZE: usize = 16;
 
 /// Memory cost in KiB (1 GB).
 // TODO: Increase to 4 GB as double to the recommended RFC amount.
-pub const ARGON2ID_MEM_COST: u32 = 1 * 1024 * 1024; // DEBUG amount
+// # DEBUG
+pub const ARGON2ID_MEM_COST: u32 = 1 * 1024; // DEBUG
+// pub const ARGON2ID_MEM_COST: u32 = 1 * 1024 * 1024; 
 
 /// Memory iterations.
 pub const ARGON2ID_ITERS: u32 = 3;
