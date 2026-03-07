@@ -335,8 +335,10 @@ impl Contact {
         self.state = ContactState::Verified;
 
 
-        let (our_next_strand_key, _) = crypto::one_time_pad(&answer_secret[..32], self.our_next_strand_key.as_ref().unwrap())?;
-        let (contact_next_strand_key, _) = crypto::one_time_pad(&answer_secret[..32], self.contact_next_strand_key.as_ref().unwrap())?;
+        let answer_secret_hashed = crypto::hash_sha3_512(&answer_secret);
+        
+        let (our_next_strand_key, _) = crypto::one_time_pad(&answer_secret_hashed[..32], self.our_next_strand_key.as_ref().unwrap())?;
+        let (contact_next_strand_key, _) = crypto::one_time_pad(&answer_secret_hashed[..32], self.contact_next_strand_key.as_ref().unwrap())?;
 
         self.our_next_strand_key = Some(Zeroizing::new(our_next_strand_key));
         self.contact_next_strand_key = Some(Zeroizing::new(contact_next_strand_key));
