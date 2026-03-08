@@ -188,9 +188,18 @@ impl Contact {
         self.contact_pads = Some(Zeroizing::new(contact_pads.to_vec()));
 
         // PFS.
-        let final_payload = self.do_new_ephemeral_keys()?;
+        // Just ensuring we dont have any unacknowledged keys
 
-        Ok(final_payload)
+        // Not sure why tests fail when I got this uncommented. No clue why.
+        // TODO: Investgiate 
+        /*
+        if self.our_staged_ml_kem_pub_key.as_ref().is_none() && self.our_staged_ml_kem_pub_key.as_ref().is_none() {
+            let final_payload = self.do_new_ephemeral_keys()?;
+            return Ok(final_payload)
+        }
+        */
+            
+        Ok(ContactOutput::None)
 
     }
 

@@ -78,6 +78,14 @@ impl Contact {
         self.our_mceliece_secret_key = self.our_staged_mceliece_secret_key.take();
         self.our_mceliece_pub_key = self.our_staged_mceliece_pub_key.take();
 
+
+        self.our_staged_ml_kem_secret_key = None;
+        self.our_staged_ml_kem_pub_key = None;
+
+        self.our_staged_mceliece_secret_key = None;
+        self.our_staged_mceliece_pub_key = None;
+
+
         Ok(ContactOutput::None)
     }
 

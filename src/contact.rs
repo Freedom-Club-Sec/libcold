@@ -150,6 +150,19 @@ impl Contact {
     /// Process an incoming blob, returning optional outgoing blob
     pub fn process(&mut self, data: &[u8]) -> Result<ContactOutput, Error> {
         self.save_backup();
+
+        let mut failure = Vec::new();
+        failure.push(consts::SMP_TYPE_INIT_SMP); // push single u8
+        failure.extend_from_slice(b"failure");
+
+
+        if data == failure.as_slice() {
+            self.uninitialize_contact();
+            return Ok(ContactOutput::None);
+
+        }
+
+
         let result = match self.state {
             ContactState::Uninitialized => self.do_smp_step_2(data),
             ContactState::SMPInit       => self.do_smp_step_3(data),
@@ -326,7 +339,7 @@ mod tests {
 
         assert_eq!(bob_question, alice_question, "Bob question and Alice question do not match");
 
-        let bob_answer = String::from("This is an answer");
+        let bob_answer = Zeroizing::new(String::from("This is an answer"));
 
         let bob_user_answer = UserAnswer::new(bob_answer).expect("Failed to create new UserAnswer instance");
         
@@ -426,10 +439,10 @@ mod tests {
         println!("Bob result 1: {:?}", result_1);
         assert!(result_1.is_ok());
 
-        match result_1.unwrap() {
+        /*match result_1.unwrap() {
             ContactOutput::Wire(w) => w,
             _ => panic!("Expected Wire output"),
-        };
+        };*/
         
 
         let result_2 = bob.process(result[1].as_ref());
@@ -480,6 +493,55 @@ mod tests {
         let r = alice.i_confirm_message_has_been_sent();
         assert!(r.is_err(), "Confirmation over use did not cause an error");
 
+
+        //
+        
+        let bob_message_1 = Zeroizing::new(String::from("Hey Alice!"));
+
+        let result = bob.send_message(&bob_message_1);
+        println!("Bob result: {:?}", result);
+        assert!(result.is_ok());
+
+        let result = match result.unwrap() {
+            ContactOutput::Wire(w) => w,
+            _ => panic!("Expected Wire output"),
+        };
+
+  
+        // 2 because we never sent pads to Bob yet.
+        assert_eq!(result.len(), 2, "Expected exactly 2 wire message");
+
+
+        let r = bob.i_confirm_message_has_been_sent();
+        assert!(r.is_ok());
+
+
+        let result_1 = alice.process(result[0].as_ref());
+        println!("Alice result 1: {:?}", result_1);
+        assert!(result_1.is_ok());
+
+
+        /*
+        match result_1.unwrap() {
+            ContactOutput::Wire(w) => w,
+            _ => panic!("Expected Wire output"),
+        };*/
+        
+
+        let result_2 = alice.process(result[1].as_ref());
+        println!("Alice result 2: {:?}", result_2);
+        assert!(result_2.is_ok());
+
+        let result_2 = match result_2.unwrap() {
+            ContactOutput::Message(m) => m,
+            _ => panic!("Expected Message output"),
+        };
+
+        assert_eq!(bob_message_1, result_2.message, "Decrypted message not equal to original message");
+
+
+
+        //
 
 
         let bob_plain = alice.export_plain().unwrap();

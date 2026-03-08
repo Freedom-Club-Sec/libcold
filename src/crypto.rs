@@ -68,7 +68,7 @@ pub fn encrypt_chacha20poly1305(key_bytes: &Zeroizing<Vec<u8>>, plaintext: &[u8]
 
     // Prepend padding length and append padding
     let mut padded_plaintext = Vec::with_capacity(consts::CHACHA20POLY1305_SIZE_LEN + plaintext.len() + padding_len);
-    padded_plaintext.extend_from_slice(&(padding_len as u16).to_be_bytes());
+    padded_plaintext.extend_from_slice(&(padding_len as u32).to_be_bytes());
     padded_plaintext.extend_from_slice(plaintext);
     padded_plaintext.extend_from_slice(&padding);
 
@@ -104,9 +104,11 @@ pub fn decrypt_chacha20poly1305(key_bytes: &Zeroizing<Vec<u8>>, nonce_bytes: &[u
     }
 
     // Read padding length
-    let padding_length = u16::from_be_bytes([
+    let padding_length = u32::from_be_bytes([
         padded_plaintext[0],
         padded_plaintext[1],
+        padded_plaintext[2],
+        padded_plaintext[3]
     ]) as usize;
 
     if padding_length > padded_plaintext.len() - consts::CHACHA20POLY1305_SIZE_LEN {

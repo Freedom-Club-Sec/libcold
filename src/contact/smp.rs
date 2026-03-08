@@ -408,10 +408,18 @@ impl Contact {
         self.do_new_ephemeral_keys()
     }
 
+    
+    pub(super) fn uninitialize_contact(&mut self)  {
+        self.state = ContactState::Uninitialized;
+        self.our_next_strand_key = None;
+        self.our_next_strand_nonce = None;
+        self.contact_next_strand_key = None;
+        self.contact_next_strand_nonce = None;
+
+    }
 
     pub(super) fn do_smp_failure(&mut self) ->  Result<ContactOutput, Error> {
-        self.state = ContactState::Uninitialized;
-
+        
         let our_next_strand_key = crypto::generate_secure_random_bytes_whiten(32)?;
         let our_next_strand_nonce = crypto::generate_secure_random_bytes_whiten(consts::CHACHA20POLY1305_NONCE_SIZE)?;
         
@@ -432,6 +440,8 @@ impl Contact {
 
         
         let (ciphertext_blob, _) = crypto::encrypt_chacha20poly1305(&our_strand_key, &out, Some(our_strand_nonce.as_slice()), consts::CHACHA20POLY1305_MAX_RANDOM_PAD)?;
+
+        self.uninitialize_contact();
 
         Ok(ContactOutput::Wire(vec![WireMessage(Zeroizing::new(ciphertext_blob))]))
     }

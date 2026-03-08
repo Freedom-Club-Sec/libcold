@@ -32,8 +32,8 @@ pub struct UserPrompt {
 pub struct UserAnswer(pub Zeroizing<String>);
 
 impl UserAnswer {
-    pub fn new(s: String) -> Result<Self, Error> {
-        Ok(Self(contact::normalize_smp_answer(Zeroizing::new(s))?))
+    pub fn new(s: Zeroizing<String>) -> Result<Self, Error> {
+        Ok(Self(contact::normalize_smp_answer(s)?))
     }
 }
 

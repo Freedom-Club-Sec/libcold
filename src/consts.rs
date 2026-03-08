@@ -22,7 +22,7 @@ pub const PFS_TYPE_PFS_ACK: u8 = 0x02;
 pub const CHACHA20POLY1305_NONCE_SIZE: usize = 12;
 
 /// Number of bytes used to store padding length
-pub const CHACHA20POLY1305_SIZE_LEN: usize = 2;
+pub const CHACHA20POLY1305_SIZE_LEN: usize = 4;
 
 /// Default maximum random padding
 pub const CHACHA20POLY1305_MAX_RANDOM_PAD: usize = 64;
